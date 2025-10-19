@@ -11,7 +11,7 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 const inter = Inter({ subsets: ["latin"] });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<unknown>(null);
     const [menuOpen, setMenuOpen] = useState(false);
       const [hasAccess, setHasAccess] = useState(false);
         const menuRef = useRef<HTMLDivElement | null>(null);
