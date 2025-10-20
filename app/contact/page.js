@@ -39,7 +39,7 @@ export default function ContactPage() {
     try {
       await emailjs.send(
         "service_ebyviio",  // Your EmailJS service ID
-        "template_l2bqr2z", // Your EmailJS template ID
+        "template_9ie0m47", // Your EmailJS template ID
         {
           from_name: formData.name || "HTG User",
           from_email: userEmail,
