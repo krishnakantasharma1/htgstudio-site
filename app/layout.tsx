@@ -85,7 +85,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                                               >
                                                       {/* NAVBAR */}
                                                               <nav className="border-b border-gray-100 bg-white sticky top-0 z-50 shadow-sm">
-                                                                        <div className="max-w-3xl mx-auto px-1 sm:px-1 md:px-1 flex items-center justify-between h-16">
+                                                                        <div className="max-w-xl mx-auto px-1 sm:px-1 md:px-1 flex items-center justify-between h-16">
                                                                                     {/* Logo */}
                                                                                                 <Link href="/courses" className="flex items-center gap-2">
                                                                                                               <Image
