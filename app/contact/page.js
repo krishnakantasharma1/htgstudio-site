@@ -4,9 +4,7 @@ import { useEffect, useState } from "react";
 import emailjs from "emailjs-com";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-
-// ✅ Initialize EmailJS
-emailjs.init("dvjcqWSaKscVIXlBS"); // <-- Your Public Key
+import Image from "next/image";
 
 export default function ContactPage() {
   const [formData, setFormData] = useState({ name: "", message: "" });
@@ -15,7 +13,7 @@ export default function ContactPage() {
   const [sent, setSent] = useState(false);
   const [error, setError] = useState("");
 
-  // ✅ Get user email automatically from Firebase
+  // ✅ Automatically fetch user email
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       if (user?.email) setUserEmail(user.email);
@@ -23,8 +21,9 @@ export default function ContactPage() {
     return () => unsub();
   }, []);
 
-  const handleChange = (e) =>
+  const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -38,17 +37,17 @@ export default function ContactPage() {
     }
 
     try {
-      const res = await emailjs.send(
-        "service_ebyviio", // ✅ Your Service ID
-        "template_9ie0m47", // ✅ Your Template ID
+      await emailjs.send(
+        "service_ebyviio",  // Your EmailJS service ID
+        "template_l2bqr2z", // Your EmailJS template ID
         {
           from_name: formData.name || "HTG User",
           from_email: userEmail,
           message: formData.message,
-        }
+        },
+        "dvjcqWSaKscVIXlBS" // Your EmailJS public key
       );
 
-      console.log("✅ Email sent successfully:", res);
       setSent(true);
       setFormData({ name: "", message: "" });
     } catch (err) {
@@ -67,7 +66,8 @@ export default function ContactPage() {
         </h1>
         <p className="text-gray-600 mb-6 text-sm sm:text-base">
           Need help or have questions?  
-          Send us a message and our team will reply to you at:
+          <br />
+          Send us a message below.
           <span className="block text-blue-600 font-semibold mt-1">
             {userEmail || "Please log in"}
           </span>
@@ -111,7 +111,9 @@ export default function ContactPage() {
               type="submit"
               disabled={loading}
               className={`w-full py-2 rounded-lg font-semibold text-white transition ${
-                loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                loading
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-blue-600 hover:bg-blue-700"
               }`}
             >
               {loading ? "Sending..." : "Send Message"}
@@ -120,11 +122,27 @@ export default function ContactPage() {
         ) : (
           <div className="text-green-600 font-semibold text-lg mt-4">
             ✅ Message sent successfully!
-            <p className="text-gray-600 text-sm mt-2">
-              We’ll get back to you soon.
-            </p>
+            <p className="text-gray-600 text-sm mt-2">We’ll get back to you soon.</p>
           </div>
         )}
+
+        {/* ✅ Telegram Button (No extra text) */}
+        {/* ✅ Telegram Icon Button Only */}
+<div className="mt-6 flex justify-center">
+  <a
+    href="https://t.me/htgstudio"  // 🔹 Replace with your actual link
+    target="_blank"
+    rel="noopener noreferrer"
+  >
+    <Image
+      src="/tg.png"
+      alt="Telegram"
+      width={200}  // adjust size if needed
+      height={50}
+      className="cursor-pointer hover:opacity-80 transition"
+    />
+  </a>
+</div>
       </div>
     </div>
   );
