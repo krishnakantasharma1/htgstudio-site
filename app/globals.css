@@ -79,3 +79,28 @@ body {
                   text-align: center !important;
               }
 }
+/* 🌍 UNIVERSAL MOBILE FIX — reduce side padding globally */
+@media (max-width: 640px) {
+  html, body {
+      padding: 0 !important;
+          margin: 0 !important;
+              overflow-x: hidden !important;
+  }
+
+    main, section, div[class*="px-"], div[class*="container"] {
+        padding-left: 0.6rem !important;
+            padding-right: 0.6rem !important;
+                margin-left: auto !important;
+                    margin-right: auto !important;
+                        max-width: 100% !important;
+    }
+
+      h1, h2 {
+          line-height: 1.2 !important;
+      }
+
+        p, li {
+            font-size: 1rem !important;
+                line-height: 1.55 !important;
+        }
+}

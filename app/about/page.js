@@ -1,49 +1,52 @@
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-      <div className="bg-white p-8 rounded-2xl shadow-md max-w-2xl text-center">
-        <div className="flex items-center justify-center gap-3 mb-6">
-          <img
-            src="/logo.png"
-            alt="Hi-Tech Gamerz Logo"
-            className="h-14 w-14 rounded-full"
-          />
-          <span className="text-2xl font-bold text-gray-700">×</span>
-          <img
-            src="/logo2.png"
-            alt="Scripto Tweaks Logo"
-            className="h-14 w-14 rounded-full"
-          />
-        </div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-3 sm:px-6 py-6">
+            <div className="bg-white p-4 sm:p-8 rounded-2xl shadow-md w-full max-w-2xl text-center">
+                    <div className="flex items-center justify-center gap-3 mb-5 sm:mb-6">
+                              <img
+                                          src="/logo.png"
+                                                      alt="Hi-Tech Gamerz Logo"
+                                                                  className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                                                                            />
+                                                                                      <span className="text-xl sm:text-2xl font-bold text-gray-700">×</span>
+                                                                                                <img
+                                                                                                            src="/logo2.png"
+                                                                                                                        alt="Scripto Tweaks Logo"
+                                                                                                                                    className="h-12 w-12 sm:h-14 sm:w-14 rounded-full"
+                                                                                                                                              />
+                                                                                                                                                      </div>
 
-        <h1 className="text-3xl font-extrabold text-gray-800 mb-4">
-          About Us
-        </h1>
+                                                                                                                                                              <h1 className="text-2xl sm:text-3xl font-extrabold text-gray-800 mb-3 sm:mb-4">
+                                                                                                                                                                        About Us
+                                                                                                                                                                                </h1>
 
-        <p className="text-gray-600 leading-relaxed">
-          We’re the creators behind <span className="font-semibold text-gray-800">Hi-Tech Gamerz</span> and{" "}
-          <span className="font-semibold text-gray-800">Scripto Tweaks</span> — two
-          passionate minds dedicated to fixing lags, improving performance, and
-          exploring every corner of Android optimization.
-        </p>
+                                                                                                                                                                                        <div className="text-gray-600 leading-relaxed space-y-3 sm:space-y-4 text-sm sm:text-base px-1">
+                                                                                                                                                                                                  <p>
+                                                                                                                                                                                                              We’re the creators behind{" "}
+                                                                                                                                                                                                                          <span className="font-semibold text-gray-800">Hi-Tech Gamerz</span> and{" "}
+                                                                                                                                                                                                                                      <span className="font-semibold text-gray-800">Scripto Tweaks</span> — two
+                                                                                                                                                                                                                                                  passionate minds dedicated to fixing lags, improving performance, and
+                                                                                                                                                                                                                                                              exploring every corner of Android optimization.
+                                                                                                                                                                                                                                                                        </p>
 
-        <p className="text-gray-600 leading-relaxed mt-4">
-          Together, we’re building a course that cuts out all the noise and
-          brings you every real method, tweak, and tool you can use to make your
-          phone perform like never before — no myths, no pointless talk, just
-          pure results.
-        </p>
+                                                                                                                                                                                                                                                                                  <p>
+                                                                                                                                                                                                                                                                                              Together, we’re building a course that cuts out all the noise and brings
+                                                                                                                                                                                                                                                                                                          you every real method, tweak, and tool you can use to make your phone
+                                                                                                                                                                                                                                                                                                                      perform like never before — no myths, no pointless talk, just pure
+                                                                                                                                                                                                                                                                                                                                  results.
+                                                                                                                                                                                                                                                                                                                                            </p>
 
-        <p className="text-gray-600 leading-relaxed mt-4">
-          Our mission is simple: help you unlock the full potential of your
-          device and truly understand how it works — because once you learn the
-          “why”, you’ll never need another tutorial again.
-        </p>
+                                                                                                                                                                                                                                                                                                                                                      <p>
+                                                                                                                                                                                                                                                                                                                                                                  Our mission is simple: help you unlock the full potential of your device
+                                                                                                                                                                                                                                                                                                                                                                              and truly understand how it works — because once you learn the “why”,
+                                                                                                                                                                                                                                                                                                                                                                                          you’ll never need another tutorial again.
+                                                                                                                                                                                                                                                                                                                                                                                                    </p>
+                                                                                                                                                                                                                                                                                                                                                                                                            </div>
 
-        <p className="text-gray-800 font-medium mt-6">
-          Let’s take your phone beyond ordinary. 🚀
-        </p>
-      </div>
-    </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                    <p className="text-gray-800 font-medium mt-5 sm:mt-6 text-base sm:text-lg">
+                                                                                                                                                                                                                                                                                                                                                                                                                              Let’s take your phone beyond ordinary. 🚀
+                                                                                                                                                                                                                                                                                                                                                                                                                                      </p>
+                                                                                                                                                                                                                                                                                                                                                                                                                                            </div>
+                                                                                                                                                                                                                                                                                                                                                                                                                                                </div>
   );
 }
