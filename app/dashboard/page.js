@@ -39,11 +39,13 @@ export default function DashboardPage() {
     <div className="max-w-4xl mx-auto py-10 px-4 sm:px-8 md:px-8 bg-white text-gray-900">
       {/* HEADER */}
       <div className="mb-6 text-center sm:text-left">
-  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome</h1>
-  {user && (
-    <p className="text-gray-600 text-base sm:text-lg mt-1 break-all">{user.email}</p>
-  )}
-</div>
+  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Welcome,</h1>
+    {user && (
+        <p className="text-gray-900 font-semibold text-xl sm:text-2xl mt-1 break-all">
+              {user.email}
+                  </p>
+    )}
+    </div>
       <p className="text-gray-600 mb-8 text-center sm:text-left">
         Manage your enrolled courses below.
       </p>
