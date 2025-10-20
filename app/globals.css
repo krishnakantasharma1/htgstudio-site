@@ -47,65 +47,51 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.15s ease-out;
 }
-/* 🔧 Mobile optimization for all pages */
-/* 🔧 Fix for narrow content and oversized text on mobile */
+/* 🔧 Fix: make mobile layout full width (remove double padding) */
 @media (max-width: 640px) {
   html, body {
       overflow-x: hidden !important;
-          padding: 0 !important;
-              margin: 0 !important;
+          margin: 0 !important;
+              padding: 0 !important;
   }
 
-    /* Prevent pages from being too narrow */
+    /* Remove Tailwind's internal max-width and centering */
       .mx-auto,
         [class*="max-w-"] {
             max-width: 100% !important;
-                margin-left: 0 !important;
-                    margin-right: 0 !important;
-                        padding-left: 0.75rem !important; /* ≈12px */
-                            padding-right: 0.75rem !important;
+                margin: 0 !important;
+                    padding: 0 !important; /* no internal padding */
         }
 
-          /* Adjust large headers */
+          /* Fix headings (make them readable, not huge) */
             h1 {
-                font-size: 1.5rem !important; /* ≈text-2xl */
-                    line-height: 1.25 !important;
+                font-size: 1.5rem !important; /* text-2xl */
+                    line-height: 1.3 !important;
             }
 
               h2 {
-                  font-size: 1.25rem !important; /* ≈text-xl */
+                  font-size: 1.25rem !important; /* text-xl */
               }
 
-                h3 {
-                    font-size: 1.1rem !important;
+                p, a, button, li, input, textarea {
+                    font-size: 0.95rem !important;
+                        line-height: 1.45 !important;
                 }
 
-                  /* Tweak paragraph and smaller text for readability */
-                    p, a, button, li, input, textarea {
-                        font-size: 0.93rem !important;
-                            line-height: 1.45 !important;
+                  /* Remove large horizontal paddings from main containers */
+                    .px-8, .px-10, .px-12, .sm\:px-6 {
+                        padding-left: 0.5rem !important;
+                            padding-right: 0.5rem !important;
                     }
 
-                      /* Prevent large paddings from squeezing text */
-                        .px-8, .px-10, .px-12 {
-                            padding-left: 0.75rem !important;
-                                padding-right: 0.75rem !important;
+                      /* Resize oversized text classes */
+                        .text-5xl, .text-6xl {
+                            font-size: 1.75rem !important;
+                                line-height: 1.2 !important;
                         }
 
-                          /* Resize oversized headings if used */
-                            .text-5xl, .text-6xl {
-                                font-size: 1.75rem !important;
-                                    line-height: 1.2 !important;
+                          /* Center where necessary */
+                            .text-center {
+                                text-align: center !important;
                             }
-
-                              /* Keep things nicely centered */
-                                .text-center {
-                                    text-align: center !important;
-                                }
-
-                                  /* Reduce button height slightly for better fit */
-                                    button, .btn, .rounded-full {
-                                        padding-top: 0.5rem !important;
-                                            padding-bottom: 0.5rem !important;
-                                    }
 }
