@@ -32,3 +32,35 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.15s ease-out;
 }
+/* 🔧 Mobile optimization for all pages */
+@media (max-width: 640px) {
+  html, body {
+      overflow-x: hidden !important;
+  }
+
+    h1 {
+        font-size: 1.75rem !important; /* ~text-3xl */
+            line-height: 1.2 !important;
+    }
+
+      h2 {
+          font-size: 1.5rem !important; /* ~text-2xl */
+      }
+
+        p, a, button, li {
+            font-size: 0.95rem !important;
+        }
+
+          .px-8 {
+              padding-left: 1rem !important;
+                  padding-right: 1rem !important;
+          }
+
+            .text-5xl, .text-6xl {
+                font-size: 2rem !important;
+            }
+
+              .text-center {
+                  text-align: center !important;
+              }
+}
