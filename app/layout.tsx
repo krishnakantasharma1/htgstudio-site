@@ -79,7 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
                       return (
                           <html lang="en" className="light">
-                            <head> <meta name="color-scheme" content="light only" /></head>
+                            
                                 <body
                                         className={`${inter.className} bg-white text-gray-900 antialiased overflow-x-hidden`}
                                               >
