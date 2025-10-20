@@ -38,9 +38,9 @@ export default function DashboardPage() {
   return (
     <div className="max-w-4xl mx-auto py-10 px-4 sm:px-6 md:px-8 bg-white text-gray-900">
       {/* HEADER */}
-      <h3 className="text-2xl sm:text-3xl font-bold mb-3 text-center sm:text-left break-words">
+      <h4 className="text-2xl sm:text-3xl font-bold mb-3 text-center sm:text-left break-words">
         Welcome{user ? `, ${user.email}` : ""}
-      </h3>
+      </h4>
       <p className="text-gray-600 mb-8 text-center sm:text-left">
         Manage your enrolled courses below.
       </p>
