@@ -2,16 +2,25 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   eslint: {
-      ignoreDuringBuilds: true, // ✅ Skip ESLint during build
+      ignoreDuringBuilds: true,
   },
     typescript: {
-        ignoreBuildErrors: true, // ✅ Skip type checking
+        ignoreBuildErrors: true,
     },
       experimental: {
           turbo: {
-                rules: {}, // ✅ Turbopack-compatible
+                rules: {},
           },
       },
+        async redirects() {
+            return [
+                  {
+                          source: "/",       // when someone visits root
+                                  destination: "/courses", // send them to your courses page
+                                          permanent: true,   // 301 redirect (SEO-friendly)
+                  },
+            ];
+        },
 };
 
 export default nextConfig;
