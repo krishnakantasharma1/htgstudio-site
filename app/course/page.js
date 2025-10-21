@@ -172,7 +172,7 @@ export default function CoursePage() {
       {/* 💬 TESTIMONIALS */}
       <section className="py-14 px-4 sm:px-6 max-w-5xl mx-auto border-t border-gray-100">
         <h2 className="text-2xl sm:text-3xl font-bold mb-8 text-center">
-          What Early Students Say 💬
+          What Early Users Say 💬
         </h2>
         <div className="space-y-6">
           {testimonials.map((t, i) => (
