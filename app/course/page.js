@@ -69,7 +69,13 @@ export default function CoursePage() {
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5 }}
-  className="font-extrabold tracking-tight mb-4 text-center whitespace-nowrap leading-snug text-[clamp(0.95rem, 3.6vw, 2.6rem)]"
+  className="font-extrabold tracking-tight mb-3 text-center whitespace-nowrap leading-tight"
+  style={{
+    fontSize: "3vw", // 🔥 much smaller than before
+    lineHeight: "1",
+    letterSpacing: "-0.04em",
+    transform: "scale(0.9)", // further shrinks visually
+  }}
 >
   Unlock Your Phone’s Hidden Power ⚡
 </motion.h1>
