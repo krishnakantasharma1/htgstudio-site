@@ -66,13 +66,14 @@ export default function CoursePage() {
       {/* 🎯 HERO SECTION */}
       <section className="flex flex-col items-center justify-center text-center py-14 px-4 sm:px-6 border-b border-gray-100">
         <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="text-4xl sm:text-5xl font-extrabold tracking-tight mb-4"
-        >
-          Unlock Your Phone’s Hidden Power ⚡
-        </motion.h1>
+  initial={{ opacity: 0, y: 20 }}
+  animate={{ opacity: 1, y: 0 }}
+  transition={{ duration: 0.5 }}
+  className="font-extrabold tracking-tight mb-4 text-center whitespace-nowrap leading-snug text-[clamp(0.95rem, 3.6vw, 2.6rem)]"
+>
+  Unlock Your Phone’s Hidden Power ⚡
+</motion.h1>
+
 
         <motion.p
           initial={{ opacity: 0, y: 10 }}
@@ -334,15 +335,15 @@ export default function CoursePage() {
   
 </section>
 <br/>
+{/* FINAL CTA HEADING */}
 <motion.h5
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5 }}
-  className="text-[1.15rem] sm:text-3xl font-semibold mb-4 leading-tight tracking-tight whitespace-nowrap"
+  className="text-[1.35rem] sm:text-3xl font-semibold mb-4 leading-tight tracking-tight whitespace-nowrap text-center"
 >
   Ready to Unlock True Performance? ⚙️
 </motion.h5>
-      
     </div>
   );
 }
