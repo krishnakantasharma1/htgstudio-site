@@ -59,6 +59,7 @@ export default function CheckoutPage() {
       alert("Please log in to continue checkout.");
       return;
     }
+    
 
     const priceINR = 175;
     const priceUSD = 1.99;
