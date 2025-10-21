@@ -66,7 +66,7 @@ export default function CheckoutPage() {
     const amount = currency === "INR" ? priceINR : priceUSD;
 
     const options = {
-      key: rzp_live_RW88YpfthOTT67,
+      key: "rzp_live_RW88YpfthOTT67",
       amount: amount * 100,
       currency,
       name: "HTG Studio",
