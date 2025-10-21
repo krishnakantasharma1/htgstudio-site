@@ -338,7 +338,7 @@ export default function CoursePage() {
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5 }}
-  className="text-[1.35rem] sm:text-3xl font-semibold mb-4 leading-tight tracking-tight whitespace-nowrap text-center"
+  className="text-[1.15rem] sm:text-3xl font-semibold mb-4 leading-tight tracking-tight whitespace-nowrap"
 >
   Ready to Unlock True Performance? ⚙️
 </motion.h5>
