@@ -71,13 +71,14 @@ export default function CoursePage() {
   transition={{ duration: 0.5 }}
   className="font-extrabold tracking-tight mb-3 text-center leading-tight text-gray-900"
   style={{
-    fontSize: "clamp(1.6rem, 5vw, 3rem)", // responsive text size
+    fontSize: "clamp(1.6rem, 5vw, 3rem)", // ✅ fits perfectly on any device
     lineHeight: "1.15",
     letterSpacing: "-0.03em",
+    whiteSpace: "normal", // ✅ allows graceful wrapping
+    wordBreak: "keep-all", // prevents weird mid-word breaks
   }}
 >
-  Unlock Your Phone’s Hidden <br />
-  <span className="text-blue-600">Power ⚡</span>
+  Unlock Your Phone’s Hidden Power ⚡
 </motion.h1>
 
 
