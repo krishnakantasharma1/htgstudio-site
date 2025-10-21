@@ -7,7 +7,6 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  sendEmailVerification,
   GoogleAuthProvider,
   signInWithPopup,
   signOut,
@@ -15,8 +14,9 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import emailjs from "emailjs-com";
 
-// ✅ Make session persistent across reloads
+// ✅ Keep session persistent
 if (auth && typeof window !== "undefined") {
   setPersistence(auth, browserLocalPersistence).catch((err) =>
     console.warn("Persistence setup failed:", err)
@@ -26,14 +26,16 @@ if (auth && typeof window !== "undefined") {
 export default function AccountPage() {
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [enteredCode, setEnteredCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // ✅ Auth observer
+  // ✅ Observe auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -53,6 +55,7 @@ export default function AccountPage() {
     return () => unsub();
   }, []);
 
+  // ✅ Next URL redirect
   const getNextUrl = () => {
     if (typeof window === "undefined") return "/";
     const params = new URLSearchParams(window.location.search);
@@ -69,13 +72,6 @@ export default function AccountPage() {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const loggedUser = userCredential.user;
 
-      if (!loggedUser.emailVerified) {
-        setError("Please verify your email before logging in.");
-        await signOut(auth);
-        setLoading(false);
-        return;
-      }
-
       const ref = doc(db, "purchases", loggedUser.uid);
       const snap = await getDoc(ref);
       localStorage.setItem(
@@ -83,22 +79,17 @@ export default function AccountPage() {
         snap.exists() && snap.data()?.hasAccess ? "true" : "false"
       );
       window.dispatchEvent(new Event("access-updated"));
-
       router.push("/dashboard");
       setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       console.error("Login error:", err);
-      if (err.code === "auth/invalid-credential") {
-        setError("Invalid email or password.");
-      } else {
-        setError("Login failed. Please try again later.");
-      }
+      setError("Invalid email or password.");
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Register
+  // ✅ Register + Send Verification Code
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
@@ -111,31 +102,83 @@ export default function AccountPage() {
     }
 
     try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const newUser = userCredential.user;
+      await createUserWithEmailAndPassword(auth, email, password);
 
-      await sendEmailVerification(newUser);
-      alert("Verification email sent. Please check your inbox before logging in.");
+      const code = Math.floor(100000 + Math.random() * 900000).toString();
+      localStorage.setItem("pending_verification_code", code);
+      localStorage.setItem("pending_verification_email", email);
 
-      if (typeof window !== "undefined") {
-        localStorage.setItem("hasAccess", "false");
-      }
+      await emailjs.send(
+        "service_34lzivs",
+        "template_zijvx5g",
+        {
+          user_name: email.split("@")[0],
+          verification_code: code,
+        },
+        "dvjcqWSaKscVIXlBS"
+      );
 
-      await signOut(auth); // force logout until email is verified
-      setIsRegistering(false);
+      setIsVerifying(true);
+      alert("✅ Verification code sent! Check your inbox.");
     } catch (err) {
       console.error("Registration failed:", err);
       if (err.code === "auth/email-already-in-use") {
         setError("Email already registered.");
       } else {
-        setError("Registration failed. Try again.");
+        setError("Failed to register. Try again.");
       }
     } finally {
       setLoading(false);
     }
   };
 
-  // ✅ Google Login
+  // ✅ Verify Code
+  const handleVerifyCode = async (e) => {
+    e.preventDefault();
+    const storedCode = localStorage.getItem("pending_verification_code");
+    const storedEmail = localStorage.getItem("pending_verification_email");
+
+    if (enteredCode === storedCode) {
+      alert("🎉 Email verified successfully! You can now log in.");
+      localStorage.removeItem("pending_verification_code");
+      localStorage.removeItem("pending_verification_email");
+      setIsVerifying(false);
+      setIsRegistering(false);
+      setEmail(storedEmail);
+    } else {
+      setError("Invalid verification code. Try again.");
+    }
+  };
+
+  // ✅ Resend Code
+  const resendCode = async () => {
+    const storedEmail = localStorage.getItem("pending_verification_email");
+    if (!storedEmail) {
+      setError("No email to resend to.");
+      return;
+    }
+
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+    localStorage.setItem("pending_verification_code", newCode);
+
+    try {
+      await emailjs.send(
+        "service_34lzivs",
+        "template_zijvx5g",
+        {
+          user_name: storedEmail.split("@")[0],
+          verification_code: newCode,
+        },
+        "dvjcqWSaKscVIXlBS"
+      );
+      alert("🔁 New code sent to your email!");
+    } catch (err) {
+      console.error("Email resend failed:", err);
+      setError("Could not resend code. Try again.");
+    }
+  };
+
+  // ✅ Google Sign-In
   const handleGoogleSignIn = async () => {
     setError("");
     setLoading(true);
@@ -145,13 +188,10 @@ export default function AccountPage() {
       const result = await signInWithPopup(auth, provider);
       const u = result.user;
 
-      if (!u.emailVerified) await sendEmailVerification(u);
-
       const ref = doc(db, "purchases", u.uid);
       const snap = await getDoc(ref);
       localStorage.setItem(`${u.email}_access`, snap.exists() ? "true" : "false");
       window.dispatchEvent(new Event("access-updated"));
-
       router.push(getNextUrl());
     } catch (err) {
       console.error("Google Sign-In failed:", err);
@@ -175,11 +215,49 @@ export default function AccountPage() {
     }
   };
 
+  // ✅ UI
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-gray-50 px-4">
       <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-md text-center border border-gray-100">
-        {!user ? (
+        {/* --- Verification Step --- */}
+        {isVerifying ? (
           <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-3">Verify Email</h1>
+            <p className="text-gray-600 mb-4">
+              Enter the 6-digit code sent to your email.
+            </p>
+
+            <form onSubmit={handleVerifyCode} className="space-y-4">
+              <input
+                type="text"
+                value={enteredCode}
+                onChange={(e) => setEnteredCode(e.target.value)}
+                maxLength="6"
+                required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                placeholder="Enter code"
+              />
+              {error && <p className="text-red-500 text-sm">{error}</p>}
+
+              <button
+                type="submit"
+                className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
+              >
+                Verify
+              </button>
+
+              <button
+                type="button"
+                onClick={resendCode}
+                className="mt-2 text-blue-600 hover:underline text-sm"
+              >
+                Resend Code
+              </button>
+            </form>
+          </>
+        ) : !user ? (
+          <>
+            {/* --- Login/Register Form --- */}
             <div className="flex justify-center mb-4">
               <div className="w-14 h-14 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full text-3xl">
                 👤
@@ -206,7 +284,7 @@ export default function AccountPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="you@example.com"
                 />
               </div>
@@ -218,7 +296,7 @@ export default function AccountPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   placeholder="••••••••"
                 />
               </div>
@@ -231,7 +309,7 @@ export default function AccountPage() {
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     placeholder="Re-enter password"
                   />
                 </div>
@@ -243,7 +321,9 @@ export default function AccountPage() {
                 type="submit"
                 disabled={loading}
                 className={`w-full text-white font-semibold py-2 rounded-lg transition ${
-                  loading ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                  loading
+                    ? "bg-gray-400 cursor-not-allowed"
+                    : "bg-blue-600 hover:bg-blue-700"
                 }`}
               >
                 {loading
@@ -254,28 +334,30 @@ export default function AccountPage() {
               </button>
             </form>
 
+            {/* --- OR Divider --- */}
             <div className="flex items-center my-6">
-  <div className="flex-grow border-t border-gray-200"></div>
-  <span className="mx-3 text-gray-400 text-sm">or</span>
-  <div className="flex-grow border-t border-gray-200"></div>
-</div>
+              <div className="flex-grow border-t border-gray-200"></div>
+              <span className="mx-3 text-gray-400 text-sm">or</span>
+              <div className="flex-grow border-t border-gray-200"></div>
+            </div>
 
+            {/* --- Google Sign-In --- */}
+            <button
+              onClick={handleGoogleSignIn}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 rounded-lg py-2 transition"
+            >
+              <img
+                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                alt="Google"
+                className="w-5 h-5"
+              />
+              <span className="text-gray-700 font-medium">
+                {isRegistering ? "Register with Google" : "Continue with Google"}
+              </span>
+            </button>
 
-<button
-  onClick={handleGoogleSignIn}
-  disabled={loading}
-  className="w-full flex items-center justify-center gap-2 border border-gray-300 hover:bg-gray-50 rounded-lg py-2 transition"
->
-  <img
-    src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-    alt="Google"
-    className="w-5 h-5"
-  />
-  <span className="text-gray-700 font-medium">
-    {isRegistering ? "Register with Google" : "Continue with Google"}
-  </span>
-</button>
-
+            {/* --- Toggle between Login / Register --- */}
             <p className="text-gray-600 mt-6 text-sm">
               {isRegistering ? "Already have an account?" : "Don’t have an account?"}{" "}
               <button
