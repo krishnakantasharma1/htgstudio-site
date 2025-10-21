@@ -14,7 +14,6 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-import emailjs from "emailjs-com";
 
 // ✅ Keep session persistent
 if (auth && typeof window !== "undefined") {
@@ -26,11 +25,9 @@ if (auth && typeof window !== "undefined") {
 export default function AccountPage() {
   const [user, setUser] = useState(null);
   const [isRegistering, setIsRegistering] = useState(false);
-  const [isVerifying, setIsVerifying] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [enteredCode, setEnteredCode] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -79,6 +76,7 @@ export default function AccountPage() {
         snap.exists() && snap.data()?.hasAccess ? "true" : "false"
       );
       window.dispatchEvent(new Event("access-updated"));
+
       router.push("/dashboard");
       setTimeout(() => window.location.reload(), 500);
     } catch (err) {
@@ -89,7 +87,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ Register + Send Verification Code
+  // ✅ Register → auto-login → redirect
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
@@ -102,24 +100,16 @@ export default function AccountPage() {
     }
 
     try {
-      await createUserWithEmailAndPassword(auth, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const newUser = userCredential.user;
 
-      const code = Math.floor(100000 + Math.random() * 900000).toString();
-      localStorage.setItem("pending_verification_code", code);
-      localStorage.setItem("pending_verification_email", email);
+      // Default access false until purchase
+      localStorage.setItem(`${newUser.email}_access`, "false");
+      window.dispatchEvent(new Event("access-updated"));
 
-      await emailjs.send(
-        "service_34lzivs",
-        "template_zijvx5g",
-        {
-          user_name: email.split("@")[0],
-          verification_code: code,
-        },
-        "dvjcqWSaKscVIXlBS"
-      );
-
-      setIsVerifying(true);
-      alert("✅ Verification code sent! Check your inbox.");
+      // ✅ Auto redirect to dashboard (already logged in)
+      router.push("/dashboard");
+      setTimeout(() => window.location.reload(), 500);
     } catch (err) {
       console.error("Registration failed:", err);
       if (err.code === "auth/email-already-in-use") {
@@ -129,52 +119,6 @@ export default function AccountPage() {
       }
     } finally {
       setLoading(false);
-    }
-  };
-
-  // ✅ Verify Code
-  const handleVerifyCode = async (e) => {
-    e.preventDefault();
-    const storedCode = localStorage.getItem("pending_verification_code");
-    const storedEmail = localStorage.getItem("pending_verification_email");
-
-    if (enteredCode === storedCode) {
-      alert("🎉 Email verified successfully! You can now log in.");
-      localStorage.removeItem("pending_verification_code");
-      localStorage.removeItem("pending_verification_email");
-      setIsVerifying(false);
-      setIsRegistering(false);
-      setEmail(storedEmail);
-    } else {
-      setError("Invalid verification code. Try again.");
-    }
-  };
-
-  // ✅ Resend Code
-  const resendCode = async () => {
-    const storedEmail = localStorage.getItem("pending_verification_email");
-    if (!storedEmail) {
-      setError("No email to resend to.");
-      return;
-    }
-
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-    localStorage.setItem("pending_verification_code", newCode);
-
-    try {
-      await emailjs.send(
-        "service_34lzivs",
-        "template_zijvx5g",
-        {
-          user_name: storedEmail.split("@")[0],
-          verification_code: newCode,
-        },
-        "dvjcqWSaKscVIXlBS"
-      );
-      alert("🔁 New code sent to your email!");
-    } catch (err) {
-      console.error("Email resend failed:", err);
-      setError("Could not resend code. Try again.");
     }
   };
 
@@ -219,45 +163,8 @@ export default function AccountPage() {
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-gray-50 px-4">
       <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-md text-center border border-gray-100">
-        {/* --- Verification Step --- */}
-        {isVerifying ? (
+        {!user ? (
           <>
-            <h1 className="text-2xl font-bold text-gray-900 mb-3">Verify Email</h1>
-            <p className="text-gray-600 mb-4">
-              Enter the 6-digit code sent to your email.
-            </p>
-
-            <form onSubmit={handleVerifyCode} className="space-y-4">
-              <input
-                type="text"
-                value={enteredCode}
-                onChange={(e) => setEnteredCode(e.target.value)}
-                maxLength="6"
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="Enter code"
-              />
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-
-              <button
-                type="submit"
-                className="w-full bg-blue-600 text-white font-semibold py-2 rounded-lg hover:bg-blue-700 transition"
-              >
-                Verify
-              </button>
-
-              <button
-                type="button"
-                onClick={resendCode}
-                className="mt-2 text-blue-600 hover:underline text-sm"
-              >
-                Resend Code
-              </button>
-            </form>
-          </>
-        ) : !user ? (
-          <>
-            {/* --- Login/Register Form --- */}
             <div className="flex justify-center mb-4">
               <div className="w-14 h-14 flex items-center justify-center bg-blue-100 text-blue-600 rounded-full text-3xl">
                 👤
@@ -303,7 +210,9 @@ export default function AccountPage() {
 
               {isRegistering && (
                 <div>
-                  <label className="block text-gray-700 font-medium mb-1">Confirm Password</label>
+                  <label className="block text-gray-700 font-medium mb-1">
+                    Confirm Password
+                  </label>
                   <input
                     type="password"
                     value={confirmPassword}
@@ -334,14 +243,12 @@ export default function AccountPage() {
               </button>
             </form>
 
-            {/* --- OR Divider --- */}
             <div className="flex items-center my-6">
               <div className="flex-grow border-t border-gray-200"></div>
               <span className="mx-3 text-gray-400 text-sm">or</span>
               <div className="flex-grow border-t border-gray-200"></div>
             </div>
 
-            {/* --- Google Sign-In --- */}
             <button
               onClick={handleGoogleSignIn}
               disabled={loading}
@@ -357,7 +264,6 @@ export default function AccountPage() {
               </span>
             </button>
 
-            {/* --- Toggle between Login / Register --- */}
             <p className="text-gray-600 mt-6 text-sm">
               {isRegistering ? "Already have an account?" : "Don’t have an account?"}{" "}
               <button
