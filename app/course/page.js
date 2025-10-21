@@ -273,10 +273,12 @@ export default function CoursePage() {
     <li>💬 Trusted by 10k+</li>
     <li>🎯 Straightforward lessons — no filler</li>
   </ul>
+  
 </section>
 
 {/* 💰 LIMITED TIME OFFER */}
 <section className="py-16 px-4 sm:px-6 max-w-4xl mx-auto text-center border-t border-gray-100 bg-gradient-to-b from-blue-50 to-white rounded-2xl shadow-sm mt-10">
+  
   
   <motion.h2
     initial={{ opacity: 0, y: 15 }}
@@ -336,7 +338,7 @@ export default function CoursePage() {
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5 }}
-  className="text-2xl sm:text-3xl font-semibold mb-4 leading-snug"
+  className="text-[1.35rem] sm:text-3xl font-semibold mb-4 leading-tight tracking-tight whitespace-nowrap text-center"
 >
   Ready to Unlock True Performance? ⚙️
 </motion.h5>
