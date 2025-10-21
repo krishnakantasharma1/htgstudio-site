@@ -131,7 +131,7 @@ export default function CoursePage() {
           onClick={handleBuy}
           className="px-8 py-4 rounded-full bg-blue-600 text-white font-semibold text-lg shadow hover:shadow-md transition-all duration-200"
         >
-          💥 Get Instant Access – $2 Lifetime
+          💥 Get Instant Access – $1.99 Lifetime
         </motion.button>
         <p className="text-gray-500 text-sm mt-3">
           💸 7-Day Money-Back Guarantee
@@ -321,7 +321,7 @@ export default function CoursePage() {
     <div className="text-gray-500 text-sm mb-1">Original Price</div>
     <div className="text-2xl sm:text-3xl font-semibold text-gray-400 line-through">$5</div>
     <div className="text-gray-700 mt-2 text-sm sm:text-base">Now only</div>
-    <div className="text-4xl sm:text-5xl font-bold text-blue-600">$2</div>
+    <div className="text-4xl sm:text-5xl font-bold text-blue-600">$1.99</div>
     <p className="text-gray-500 text-sm mt-2">🎯 One-time payment • Lifetime access</p>
   </motion.div>
 
@@ -332,7 +332,7 @@ export default function CoursePage() {
     onClick={handleBuy}
     className="px-10 py-4 rounded-full bg-blue-600 text-white font-semibold text-lg shadow hover:shadow-lg transition-all duration-200"
   >
-    💥 Get the Course for Just $2
+    💥 Get the Course for Just $1.99
   </motion.button>
 
   <p className="text-gray-500 text-xs mt-3">

@@ -59,7 +59,7 @@ export default function CheckoutPage() {
 
                                       const options = {
                                             key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-                                                  amount: 200 * 100,
+                                                  amount: 175 * 100,
                                                         currency: "INR",
                                                               name: "HTG Studio",
                                                                     description: "Phone Boost Course - Lifetime Access",
@@ -157,7 +157,7 @@ export default function CheckoutPage() {
                                       <div className="flex flex-col items-center justify-center min-h-[70vh] bg-white text-gray-900 px-4">
                                             <h1 className="text-4xl font-bold mb-4">Unlock Phone Boost Course ⚡</h1>
                                                   <p className="text-gray-600 max-w-xl text-center mb-8">
-                                                          Get lifetime access for just <b>₹200</b> — boost speed, extend battery life, and
+                                                          Get lifetime access for just <b>$1.99</b> — boost speed, extend battery life, and
                                                                   secure your phone like a pro.
                                                                         </p>
 

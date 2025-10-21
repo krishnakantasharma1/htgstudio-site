@@ -36,7 +36,7 @@ export default function CoursesPage() {
                           title: "Phone Performance Boost Masterclass",
                                 description:
                                         "Make your phone faster, smoother, and extend battery life — the complete step-by-step course.",
-                                              price: "₹149",
+                                              price: "$1.99",
                                                     image: "/course-phone.jpg",
               },
           ];
