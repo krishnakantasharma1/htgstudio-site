@@ -78,7 +78,7 @@ export default function CoursePage() {
     wordBreak: "keep-all", // prevents weird mid-word breaks
   }}
 >
-  Unlock Your Phone’s Hidden Power ⚡
+  Unlock Your Phone’s Hidden Power 
 </motion.h1>
 
 

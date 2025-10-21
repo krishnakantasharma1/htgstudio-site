@@ -1,179 +1,186 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { useRouter } from "next/navigation";
+import Script from "next/script";
+import Image from "next/image";
 
 export default function CheckoutPage() {
+  const [user, setUser] = useState(null);
+  const [country, setCountry] = useState("");
+  const [currency, setCurrency] = useState("INR");
+  const [loading, setLoading] = useState(true);
+  const [hasAccess, setHasAccess] = useState(false);
   const router = useRouter();
 
-    const [user, setUser] = useState(null);
-      const [checkingUser, setCheckingUser] = useState(true);
-        const [processing, setProcessing] = useState(false);
-          const [hasAccess, setHasAccess] = useState(false);
+  // ✅ Detect country via IP
+  useEffect(() => {
+    fetch("https://ipapi.co/json/")
+      .then((res) => res.json())
+      .then((data) => {
+        setCountry(data.country_name || "Unknown");
+        if (data.country_code && data.country_code !== "IN") {
+          setCurrency("USD");
+        }
+      })
+      .catch(() => setCountry("Unknown"))
+      .finally(() => setLoading(false));
+  }, []);
 
-            // ✅ Watch for Firebase login state
-              useEffect(() => {
-                  const unsubscribe = auth.onAuthStateChanged(async (u) => {
-                        setUser(u);
-                              setCheckingUser(false);
+  // ✅ Watch user auth
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      if (!u) {
+        router.push("/account?next=/checkout/phone-boost");
+        return;
+      }
+      setUser(u);
 
-                                    if (u) {
-                                            try {
-                                                      const ref = doc(db, "purchases", u.uid);
-                                                                const snap = await getDoc(ref);
-                                                                          if (snap.exists() && snap.data()?.hasAccess) {
-                                                                                      setHasAccess(true);
-                                                                                                  localStorage.setItem(`${u.email}_access`, "true");
-                                                                          }
-                                            } catch (err) {
-                                                      console.error("Error reading purchase:", err);
-                                            }
-                                    }
-                  });
+      // ✅ Check Firestore if user already owns course
+      try {
+        const ref = doc(db, "purchases", u.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists() && snap.data()?.hasAccess) {
+          setHasAccess(true);
+          localStorage.setItem(`${u.email}_access`, "true");
+        }
+      } catch (err) {
+        console.error("Error reading Firestore:", err);
+      }
+    });
+    return () => unsub();
+  }, [router]);
 
-                      return () => unsubscribe();
-              }, []);
+  // ✅ Razorpay payment
+  const handlePayment = async () => {
+    if (!user) {
+      alert("Please log in to continue checkout.");
+      return;
+    }
 
-                // ✅ Load Razorpay script dynamically
-                  useEffect(() => {
-                      const script = document.createElement("script");
-                          script.src = "https://checkout.razorpay.com/v1/checkout.js";
-                              script.async = true;
-                                  document.body.appendChild(script);
-                                      return () => {
-                                            document.body.removeChild(script);
-                                      };
-                  }, []);
+    const priceINR = 175;
+    const priceUSD = 1.99;
+    const amount = currency === "INR" ? priceINR : priceUSD;
 
-                    // ✅ Handle Razorpay payment
-                      const handlePayment = async () => {
-                          if (checkingUser) return;
-                              if (!user) {
-                                    router.push("/account?next=/checkout/phone-boost");
-                                          return;
-                              }
+    const options = {
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      amount: amount * 100,
+      currency,
+      name: "HTG Studio",
+      description: "Phone Boost Course",
+      image: "/logo.png",
+      handler: async (response) => {
+        try {
+          await setDoc(doc(db, "purchases", user.uid), {
+            hasAccess: true,
+            paymentId: response.razorpay_payment_id,
+            email: user.email,
+            amount,
+            currency,
+            timestamp: new Date(),
+          });
+          localStorage.setItem(`${user.email}_access`, "true");
+          window.dispatchEvent(new Event("access-updated"));
+          alert("✅ Payment successful!");
+          router.push("/dashboard");
+        } catch (err) {
+          console.error("Firestore write failed:", err);
+          alert("Payment success, but saving data failed.");
+        }
+      },
+      prefill: { email: user?.email || "" },
+      theme: { color: "#2563eb" },
+    };
 
-                                  setProcessing(true);
+    const rzp = new window.Razorpay(options);
+    rzp.open();
+  };
 
-                                      const options = {
-                                            key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-                                                  amount: 175 * 100,
-                                                        currency: "INR",
-                                                              name: "HTG Studio",
-                                                                    description: "Phone Boost Course - Lifetime Access",
-                                                                          image: "/logo.png",
+  // ✅ Loading UI
+  if (loading)
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-600">
+        <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+        Detecting your location...
+      </div>
+    );
 
-                                                                                handler: async function (response) {
-                                                                                        try {
-                                                                                                  console.log("✅ Payment success:", response);
+  // ✅ If already purchased
+  if (hasAccess) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-md p-8 text-center">
+          <Image
+            src="/course-phone.jpg"
+            alt="Phone Boost Course"
+            width={600}
+            height={300}
+            className="rounded-xl mb-5 object-cover mx-auto"
+          />
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            You already own this course 🎉
+          </h1>
+          <p className="text-gray-600 mb-6">
+            You can access your content anytime from your dashboard.
+          </p>
+          <button
+            onClick={() => router.push("/dashboard")}
+            className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-sm hover:shadow-md"
+          >
+            Go to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-                                                                                                            const activeUser = auth.currentUser;
-                                                                                                                      if (!activeUser) {
-                                                                                                                                  alert("Payment succeeded, but no user detected. Please contact support.");
-                                                                                                                                              return;
-                                                                                                                      }
+  // ✅ Normal checkout screen
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6">
+      <Script src="https://checkout.razorpay.com/v1/checkout.js" />
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-md p-6 sm:p-8 text-center">
+        <Image
+          src="/course-phone.jpg"
+          alt="Phone Boost Course"
+          width={600}
+          height={300}
+          className="rounded-xl mb-5 object-cover mx-auto"
+        />
 
-                                                                                                                                // ✅ Save purchase locally
-                                                                                                                                          localStorage.setItem(`${activeUser.email}_access`, "true");
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Phone Boost Masterclass
+        </h1>
+        <p className="text-gray-600 mb-6 text-sm">
+          Make your phone faster, smoother, and extend its battery life.
+        </p>
 
-                                                                                                                                                    // ✅ Notify navbar immediately
-                                                                                                                                                              window.dispatchEvent(new Event("access-updated"));
+        <div className="bg-gray-50 rounded-lg p-3 mb-6 text-sm text-gray-700 border">
+          <p>
+            🌍 You’re accessing from{" "}
+            <span className="font-semibold">{country}</span>
+          </p>
+          <p>
+            💳 Price:{" "}
+            <span className="font-semibold text-blue-600">
+              {currency === "INR" ? "₹175" : "$1.99"}
+            </span>{" "}
+            (one-time payment)
+          </p>
+        </div>
 
-                                                                                                                                                                        // ✅ Save purchase in Firestore
-                                                                                                                                                                                  const purchaseRef = doc(db, "purchases", activeUser.uid);
-                                                                                                                                                                                            await setDoc(
-                                                                                                                                                                                                        purchaseRef,
-                                                                                                                                                                                                                    {
-                                                                                                                                                                                                                                  hasAccess: true,
-                                                                                                                                                                                                                                                paymentId: response.razorpay_payment_id,
-                                                                                                                                                                                                                                                              purchasedAt: new Date().toISOString(),
-                                                                                                                                                                                                                    },
-                                                                                                                                                                                                                                { merge: true }
-                                                                                                                                                                                            );
+        <button
+          onClick={handlePayment}
+          className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-sm hover:shadow-md"
+        >
+          Pay {currency === "INR" ? "₹175" : "$1.99"} Now
+        </button>
 
-                                                                                                                                                                                                      console.log("✅ Firestore write successful");
-
-                                                                                                                                                                                                                alert("Payment successful! Redirecting to your dashboard...");
-
-                                                                                                                                                                                                                          // ✅ Go to dashboard and refresh so navbar updates instantly
-                                                                                                                                                                                                                                    router.push("/dashboard");
-                                                                                                                                                                                                                                              setTimeout(() => window.location.reload(), 1000);
-                                                                                        } catch (err) {
-                                                                                                  console.error("❌ Error writing to Firestore:", err);
-                                                                                                            alert("Payment succeeded, but data sync failed. Please contact support.");
-                                                                                        } finally {
-                                                                                                  setProcessing(false);
-                                                                                        }
-                                                                                },
-
-                                                                                      prefill: {
-                                                                                              name: user.displayName || "HTG User",
-                                                                                                      email: user.email,
-                                                                                      },
-                                                                                            theme: { color: "#2563EB" },
-                                      };
-
-                                          const paymentObject = new window.Razorpay(options);
-
-                                              paymentObject.on("payment.failed", function (response) {
-                                                    console.error("❌ Payment failed:", response);
-                                                          alert("Payment failed. Please try again.");
-                                                                setProcessing(false);
-                                              });
-
-                                                  paymentObject.open();
-                      };
-
-                        // ✅ If user already owns course
-                          if (hasAccess) {
-                              return (
-                                    <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-4">
-                                            <h1 className="text-3xl font-bold mb-4">You already own this course 🎉</h1>
-                                                    <p className="text-gray-600 mb-6">Access it anytime from your dashboard.</p>
-                                                            <button
-                                                                      onClick={() => router.push("/dashboard")}
-                                                                                className="px-6 py-3 bg-blue-600 text-white rounded-full font-semibold hover:bg-blue-700 transition"
-                                                                                        >
-                                                                                                  Go to Dashboard
-                                                                                                          </button>
-                                                                                                                </div>
-                              );
-                          }
-
-                            // ✅ While checking auth
-                              if (checkingUser) {
-                                  return (
-                                        <div className="flex flex-col items-center justify-center min-h-[70vh] text-center">
-                                                <h1 className="text-2xl font-semibold text-gray-700 mb-2">Checking account…</h1>
-                                                        <p className="text-gray-500 text-sm">Please wait a moment</p>
-                                                              </div>
-                                  );
-                              }
-
-                                // ✅ Main checkout view
-                                  return (
-                                      <div className="flex flex-col items-center justify-center min-h-[70vh] bg-white text-gray-900 px-4">
-                                            <h1 className="text-4xl font-bold mb-4">Unlock Phone Boost Course ⚡</h1>
-                                                  <p className="text-gray-600 max-w-xl text-center mb-8">
-                                                          Get lifetime access for just <b>$1.99</b> — boost speed, extend battery life, and
-                                                                  secure your phone like a pro.
-                                                                        </p>
-
-                                                                              <button
-                                                                                      onClick={handlePayment}
-                                                                                              disabled={processing}
-                                                                                                      className={`px-12 py-4 rounded-full text-white font-semibold text-lg transition-all duration-200 shadow ${
-                                                                                                                processing ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-                                                                                                      }`}
-                                                                                                            >
-                                                                                                                    {processing ? "Processing..." : "Buy Now"}
-                                                                                                                          </button>
-
-                                                                                                                                <p className="text-gray-400 text-sm mt-6">
-                                                                                                                                        Secure checkout powered by Razorpay 🔒
-                                                                                                                                              </p>
-                                                                                                                                                  </div>
-                                  );
+        <p className="text-xs text-gray-500 mt-4">
+          Secured payment powered by Razorpay.
+        </p>
+      </div>
+    </div>
+  );
 }
