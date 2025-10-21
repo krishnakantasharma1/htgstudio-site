@@ -59,14 +59,14 @@ export default function CheckoutPage() {
       alert("Please log in to continue checkout.");
       return;
     }
-    
+
 
     const priceINR = 175;
     const priceUSD = 1.99;
     const amount = currency === "INR" ? priceINR : priceUSD;
 
     const options = {
-      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      key: rzp_live_RW88YpfthOTT67,
       amount: amount * 100,
       currency,
       name: "HTG Studio",
