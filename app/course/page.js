@@ -1,5 +1,5 @@
 "use client";
-
+ 
 import { motion } from "framer-motion";
 import { useState, useEffect } from "react";
 import { auth } from "@/lib/firebase";
@@ -69,12 +69,13 @@ export default function CoursePage() {
   initial={{ opacity: 0, y: 20 }}
   animate={{ opacity: 1, y: 0 }}
   transition={{ duration: 0.5 }}
-  className="font-extrabold tracking-tight mb-3 text-center whitespace-nowrap leading-tight"
+  className="font-extrabold tracking-tight mb-3 text-center leading-tight text-gray-900"
   style={{
-    fontSize: "3vw", // 🔥 much smaller than before
-    lineHeight: "1",
-    letterSpacing: "-0.04em",
-    transform: "scale(0.9)", // further shrinks visually
+    fontSize: "clamp(1.6rem, 5vw, 3rem)", // ✅ fits perfectly on any device
+    lineHeight: "1.15",
+    letterSpacing: "-0.03em",
+    whiteSpace: "normal", // ✅ allows graceful wrapping
+    wordBreak: "keep-all", // prevents weird mid-word breaks
   }}
 >
   Unlock Your Phone’s Hidden Power ⚡
