@@ -35,8 +35,18 @@ export default function ContactPage() {
       setLoading(false);
       return;
     }
-
+    
     try {
+     // simple email pattern check
+const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(userEmail);
+if (!isValidEmail) {
+  setError("Your email address appears invalid.");
+  setLoading(false);
+  return;
+}
+
+
+
       await emailjs.send(
         "service_ebyviio",  // Your EmailJS service ID
         "template_9ie0m47", // Your EmailJS template ID
@@ -68,9 +78,12 @@ export default function ContactPage() {
           Need help or have questions?  
           <br />
           Send us a message below.
-          <span className="block text-blue-600 font-semibold mt-1">
-            {userEmail || "Please log in"}
-          </span>
+          
+          <p className="text-gray-500 text-sm mt-3">
+  ⚠️ This feature only works if you registered with a
+  <span className="font-medium text-blue-600"> valid, email address.</span>
+</p>
+
         </p>
 
         {!sent ? (
