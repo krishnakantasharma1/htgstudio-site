@@ -81,7 +81,7 @@ export default function CheckoutPage() {
   const order = data.order;
 
   const razorpayKey =
-    process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_RW88YpfthOTT67";
+    "rzp_live_RW88YpfthOTT67";
 
   // ✅ Initialize Razorpay payment
   const options = {
