@@ -55,49 +55,105 @@ export default function CheckoutPage() {
 
   // ✅ Razorpay payment
   const handlePayment = async () => {
-    if (!user) {
-      alert("Please log in to continue checkout.");
+  if (!user) {
+    alert("Please log in to continue checkout.");
+    return;
+  }
+
+  const priceINR = 1;
+  const priceUSD = 1.99;
+  const amount = currency === "INR" ? priceINR : priceUSD;
+
+  // ✅ Create order securely on backend
+  const res = await fetch("/api/create-order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amount, currency }),
+  });
+
+  const data = await res.json();
+  if (!data.success || !data.order) {
+    alert("Failed to create order. Please try again.");
+    console.error(data.error);
+    return;
+  }
+
+  const order = data.order;
+
+  const razorpayKey =
+    process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_live_RW88YpfthOTT67";
+
+  // ✅ Initialize Razorpay payment
+  const options = {
+    key: razorpayKey,
+    amount: order.amount,
+    currency: order.currency,
+    name: "HTG Studio",
+    description: "Phone Boost Course",
+    image: "/logo.png",
+    order_id: order.id,
+    
+handler: async function (response) {
+  try {
+    console.log("✅ Payment success:", response);
+
+    const activeUser = auth.currentUser;
+    if (!activeUser) {
+      alert("Payment succeeded, but no user detected. Please contact support.");
       return;
     }
 
+    // 🔹 Step 1: Verify payment on server
+    const verifyRes = await fetch("/api/verify-payment", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        razorpay_order_id: response.razorpay_order_id,
+        razorpay_payment_id: response.razorpay_payment_id,
+        razorpay_signature: response.razorpay_signature,
+      }),
+    });
 
-    const priceINR = 175;
-    const priceUSD = 1.99;
-    const amount = currency === "INR" ? priceINR : priceUSD;
+    const verifyData = await verifyRes.json();
 
-    const options = {
-      key: "rzp_live_RW88YpfthOTT67",
-      amount: amount * 100,
-      currency,
-      name: "HTG Studio",
-      description: "Phone Boost Course",
-      image: "/logo.png",
-      handler: async (response) => {
-        try {
-          await setDoc(doc(db, "purchases", user.uid), {
-            hasAccess: true,
-            paymentId: response.razorpay_payment_id,
-            email: user.email,
-            amount,
-            currency,
-            timestamp: new Date(),
-          });
-          localStorage.setItem(`${user.email}_access`, "true");
-          window.dispatchEvent(new Event("access-updated"));
-          alert("✅ Payment successful!");
-          router.push("/dashboard");
-        } catch (err) {
-          console.error("Firestore write failed:", err);
-          alert("Payment success, but saving data failed.");
-        }
+    if (!verifyData.success) {
+      alert("⚠️ Payment verification failed. Please contact support.");
+      setProcessing(false);
+      return;
+    }
+
+    // 🔹 Step 2: Verified → save purchase in Firestore as before
+    const purchaseRef = doc(db, "purchases", activeUser.uid);
+    await setDoc(
+      purchaseRef,
+      {
+        hasAccess: true,
+        paymentId: response.razorpay_payment_id,
+        purchasedAt: new Date().toISOString(),
       },
-      prefill: { email: user?.email || "" },
-      theme: { color: "#2563eb" },
-    };
+      { merge: true }
+    );
 
-    const rzp = new window.Razorpay(options);
-    rzp.open();
+    localStorage.setItem(`${activeUser.email}_access`, "true");
+    window.dispatchEvent(new Event("access-updated"));
+
+    alert("Payment successful! Redirecting to your dashboard...");
+    router.push("/dashboard");
+    setTimeout(() => window.location.reload(), 1000);
+  } catch (err) {
+    console.error("❌ Error verifying or writing to Firestore:", err);
+    alert("Payment succeeded, but verification failed. Please contact support.");
+  } finally {
+    setProcessing(false);
+  }
+},
+    prefill: { email: user?.email || "" },
+    theme: { color: "#2563eb" },
   };
+
+  const rzp = new window.Razorpay(options);
+  rzp.open();
+};
 
   // ✅ Loading UI
   if (loading)
