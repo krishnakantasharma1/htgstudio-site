@@ -295,7 +295,7 @@ export default function CoursePage() {
     viewport={{ once: true }}
     className="text-3xl sm:text-4xl font-bold mb-4 text-gray-900"
   >
-    🎉 Limited-Time Launch Offer
+    🎉 Limited-Time Offer
   </motion.h2>
 
   <motion.p
@@ -306,7 +306,7 @@ export default function CoursePage() {
     className="text-gray-600 mb-8 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed"
   >
     Unlock the complete <b>Phone Boost Masterclass</b> today at a special
-    launch price! Learn advanced tweaks, root safely, and speed up any
+    price! Learn advanced tweaks, root safely, and speed up any
     Android — <span className="text-blue-600 font-semibold">lifetime access included</span>.
   </motion.p>
 

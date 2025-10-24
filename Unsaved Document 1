@@ -1,0 +1,21 @@
+## Error Type
+Runtime FirebaseError
+
+## Error Message
+Firebase: Error (auth/invalid-api-key).
+
+
+    at <unknown> (lib/firebase.js:22:21)
+    at <unknown> (app/layout.tsx:8:1)
+
+## Code Frame
+  20 |
+  21 | // ✅ create auth once
+> 22 | const auth = getAuth(app);
+     |                     ^
+  23 |
+  24 | // ✅ make login persist across refresh & navigation
+  25 | setPersistence(auth, browserLocalPersistence).catch(console.error);
+
+Next.js version: 15.5.6 (Turbopack)
+

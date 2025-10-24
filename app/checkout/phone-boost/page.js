@@ -13,6 +13,8 @@ export default function CheckoutPage() {
   const [currency, setCurrency] = useState("INR");
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [accepted, setAccepted] = useState(false); // ✅ new state for terms checkbox
   const router = useRouter();
 
   // ✅ Detect country via IP
@@ -55,105 +57,115 @@ export default function CheckoutPage() {
 
   // ✅ Razorpay payment
   const handlePayment = async () => {
-  if (!user) {
-    alert("Please log in to continue checkout.");
-    return;
-  }
-
-  const priceINR = 1;
-  const priceUSD = 1.99;
-  const amount = currency === "INR" ? priceINR : priceUSD;
-
-  // ✅ Create order securely on backend
-  const res = await fetch("/api/create-order", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amount, currency }),
-  });
-
-  const data = await res.json();
-  if (!data.success || !data.order) {
-    alert("Failed to create order. Please try again.");
-    console.error(data.error);
-    return;
-  }
-
-  const order = data.order;
-
-  const razorpayKey =
-    "rzp_live_RW88YpfthOTT67";
-
-  // ✅ Initialize Razorpay payment
-  const options = {
-    key: razorpayKey,
-    amount: order.amount,
-    currency: order.currency,
-    name: "HTG Studio",
-    description: "Phone Boost Course",
-    image: "/logo.png",
-    order_id: order.id,
-    
-handler: async function (response) {
-  try {
-    console.log("✅ Payment success:", response);
-
-    const activeUser = auth.currentUser;
-    if (!activeUser) {
-      alert("Payment succeeded, but no user detected. Please contact support.");
+    if (!user) {
+      alert("Please log in to continue checkout.");
       return;
     }
 
-    // 🔹 Step 1: Verify payment on server
-    const verifyRes = await fetch("/api/verify-payment", {
+    if (!accepted) {
+      alert("Please accept the Terms, Conditions, and Refund Policy before proceeding.");
+      return;
+    }
+
+    const priceINR = 1;
+    const priceUSD = 1.99;
+    const amount = currency === "INR" ? priceINR : priceUSD;
+
+    setProcessing(true);
+
+    // ✅ Create order securely on backend
+    const res = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        razorpay_order_id: response.razorpay_order_id,
-        razorpay_payment_id: response.razorpay_payment_id,
-        razorpay_signature: response.razorpay_signature,
+        amount,
+        currency,
+        userId: user?.uid,
       }),
     });
 
-    const verifyData = await verifyRes.json();
-
-    if (!verifyData.success) {
-      alert("⚠️ Payment verification failed. Please contact support.");
+    const data = await res.json();
+    if (!data.success || !data.order) {
+      alert("Failed to create order. Please try again.");
+      console.error(data.error);
       setProcessing(false);
       return;
     }
 
-    // 🔹 Step 2: Verified → save purchase in Firestore as before
-    const purchaseRef = doc(db, "purchases", activeUser.uid);
-    await setDoc(
-      purchaseRef,
-      {
-        hasAccess: true,
-        paymentId: response.razorpay_payment_id,
-        purchasedAt: new Date().toISOString(),
+    const order = data.order;
+    const razorpayKey = "rzp_live_RW88YpfthOTT67";
+
+    const options = {
+      key: razorpayKey,
+      amount: order.amount,
+      currency: order.currency,
+      name: "HTG Studio",
+      description: "Phone Boost Course",
+      image: "/logo.png",
+      order_id: order.id,
+
+      handler: async function (response) {
+        try {
+          console.log("✅ Payment success:", response);
+
+          const activeUser = auth.currentUser;
+          if (!activeUser) {
+            alert("Payment succeeded, but no user detected. Please contact support.");
+            return;
+          }
+
+          // 🔹 Verify payment on server
+          const verifyRes = await fetch("/api/verify-payment", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              userId: activeUser.uid, // ✅ ensure backend gets it
+            }),
+          });
+
+          const verifyData = await verifyRes.json();
+
+          if (!verifyData.success) {
+            alert("⚠️ Payment verification failed. Please contact support.");
+            setProcessing(false);
+            return;
+          }
+
+          // 🔹 Verified → save purchase in Firestore
+          const purchaseRef = doc(db, "purchases", activeUser.uid);
+          await setDoc(
+            purchaseRef,
+            {
+              hasAccess: true,
+              paymentId: response.razorpay_payment_id,
+              purchasedAt: new Date().toISOString(),
+            },
+            { merge: true }
+          );
+
+          localStorage.setItem(`${activeUser.email}_access`, "true");
+          window.dispatchEvent(new Event("access-updated"));
+
+          alert("Payment successful! Redirecting to your dashboard...");
+          router.push("/dashboard");
+          setTimeout(() => window.location.reload(), 1000);
+        } catch (err) {
+          console.error("❌ Error verifying or writing to Firestore:", err);
+          alert("Payment succeeded, but verification failed. Please contact support.");
+        } finally {
+          setProcessing(false);
+        }
       },
-      { merge: true }
-    );
+      prefill: { email: user?.email || "" },
+      theme: { color: "#2563eb" },
+    };
 
-    localStorage.setItem(`${activeUser.email}_access`, "true");
-    window.dispatchEvent(new Event("access-updated"));
-
-    alert("Payment successful! Redirecting to your dashboard...");
-    router.push("/dashboard");
-    setTimeout(() => window.location.reload(), 1000);
-  } catch (err) {
-    console.error("❌ Error verifying or writing to Firestore:", err);
-    alert("Payment succeeded, but verification failed. Please contact support.");
-  } finally {
-    setProcessing(false);
-  }
-},
-    prefill: { email: user?.email || "" },
-    theme: { color: "#2563eb" },
+    const rzp = new window.Razorpay(options);
+    rzp.open();
   };
-
-  const rzp = new window.Razorpay(options);
-  rzp.open();
-};
 
   // ✅ Loading UI
   if (loading)
@@ -227,11 +239,42 @@ handler: async function (response) {
           </p>
         </div>
 
+        {/* ✅ Checkbox for Terms */}
+        <div className="flex items-center mb-4 text-left">
+          <input
+            id="terms"
+            type="checkbox"
+            checked={accepted}
+            onChange={(e) => setAccepted(e.target.checked)}
+            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+          />
+          <label
+            htmlFor="terms"
+            className="ml-2 text-sm text-gray-600 select-none"
+          >
+            I accept the{" "}
+            <a href="/terms" target="_blank" className="text-blue-600 hover:underline">
+              Terms & Conditions
+            </a>{" "}
+            and{" "}
+            <a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">
+              Refund Policy
+            </a>.
+          </label>
+        </div>
+
         <button
           onClick={handlePayment}
-          className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-sm hover:shadow-md"
+          disabled={processing}
+          className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
+            processing
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
+          }`}
         >
-          Pay {currency === "INR" ? "₹175" : "$1.99"} Now
+          {processing
+            ? "Processing..."
+            : `Pay ${currency === "INR" ? "₹175" : "$1.99"} Now`}
         </button>
 
         <p className="text-xs text-gray-500 mt-4">
