@@ -138,7 +138,7 @@ export default function CheckoutPage() {
   };
 
   // ✅ PayPal Integration
-  // ✅ PayPal Integration (with Terms Pre-check)
+// ✅ PayPal Integration (with stable Terms message + delay)
 useEffect(() => {
   if (currency === "INR" || !user) return;
   const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
@@ -152,14 +152,20 @@ useEffect(() => {
         .Buttons({
           style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
 
-          // 🛑 Prevent PayPal popup if terms not accepted
+          // 🛑 Stop PayPal popup if Terms unchecked
           onClick: (data, actions) => {
             if (!accepted) {
+              // Show animated message under buttons
               setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
-              setTimeout(() => setInfoMessage(""), 4000);
-              return actions.reject(); // ❌ stop PayPal popup
+
+              // Keep message visible for 4 seconds, fade out smoothly
+              const fadeTimer = setTimeout(() => {
+                setInfoMessage("");
+              }, 4000);
+
+              return actions.reject(); // Stop popup opening
             }
-            return actions.resolve(); // ✅ continue normally
+            return actions.resolve(); // Continue normally
           },
 
           createOrder: async () => {
@@ -204,12 +210,14 @@ useEffect(() => {
           onError: () => {
             setShowHover(true);
             setInfoMessage("⚠️ Payment failed. Please try again or contact @htgstudio.");
+            setTimeout(() => setInfoMessage(""), 6000);
           },
         })
         .render("#paypal-button-container");
     }
   };
 
+  // Load SDK dynamically if not already loaded
   if (!window.paypal) {
     const script = document.createElement("script");
     script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
