@@ -17,10 +17,10 @@ export default function CheckoutPage() {
   const [processing, setProcessing] = useState(false);
   const [accepted, setAccepted] = useState(false);
   const [infoMessage, setInfoMessage] = useState("");
-  const [showHover, setShowHover] = useState(false); // 💬 Hover on failure
+  const [showHover, setShowHover] = useState(false);
   const router = useRouter();
 
-  // ✅ Detect country
+  // ✅ Detect user country
   useEffect(() => {
     fetch("https://ipapi.co/json/")
       .then((res) => res.json())
@@ -35,7 +35,7 @@ export default function CheckoutPage() {
 
   const restrictedCountries = ["PK", "BD", "NG", "AF", "CU", "IR", "SD", "SY"];
 
-  // ✅ Watch Auth
+  // ✅ Watch Firebase Auth
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) {
@@ -57,7 +57,7 @@ export default function CheckoutPage() {
     return () => unsub();
   }, [router]);
 
-  // ✅ Razorpay payment
+  // ✅ Razorpay Payment
   const handleRazorpay = async () => {
     if (!accepted) {
       setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
@@ -211,6 +211,14 @@ export default function CheckoutPage() {
     }
   }, [currency, user, accepted, router]);
 
+  // ✅ Auto-hide hover after 10s
+  useEffect(() => {
+    if (showHover) {
+      const timer = setTimeout(() => setShowHover(false), 10000);
+      return () => clearTimeout(timer);
+    }
+  }, [showHover]);
+
   if (loading)
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-gray-600">
@@ -273,7 +281,21 @@ export default function CheckoutPage() {
             {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
           </button>
         ) : (
-          <div id="paypal-button-container" className="w-full mt-3"></div>
+          <>
+            <div id="paypal-button-container" className="w-full mt-3"></div>
+            {/* ✅ Constant text under PayPal */}
+            <p className="text-sm text-gray-800 mt-5 font-semibold">
+              💬 Can’t make payment using the available methods?{" "}
+              <a
+                href="https://t.me/htgstudio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 font-bold hover:underline"
+              >
+                Contact us on Telegram
+              </a>
+            </p>
+          </>
         )}
 
         {infoMessage && (
@@ -292,7 +314,7 @@ export default function CheckoutPage() {
           </p>
         )}
 
-        {/* 💬 Hover for failed payments only */}
+        {/* 💬 Hover for failed payments (auto-hides after 10s) */}
         {showHover && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-pulse">
             💬 Can’t make payment using the available methods?{" "}
