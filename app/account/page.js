@@ -14,6 +14,15 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+// ✅ Force one-time page refresh to fix stale auth state
+if (typeof window !== "undefined") {
+  const hasRefreshed = sessionStorage.getItem("accountRefreshed");
+  if (!hasRefreshed) {
+    sessionStorage.setItem("accountRefreshed", "true");
+    window.location.reload();
+  }
+}
+
 
 // ✅ Keep session persistent
 if (auth && typeof window !== "undefined") {
