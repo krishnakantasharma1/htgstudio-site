@@ -67,7 +67,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    const priceINR = 175;
+    const priceINR = 1;
     const priceUSD = 1.99;
     const amount = currency === "INR" ? priceINR : priceUSD;
 
