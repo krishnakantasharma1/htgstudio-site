@@ -34,17 +34,8 @@ export default function CheckoutPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  // ✅ Restricted countries where PayPal may not work
-  const restrictedCountries = [
-    "PK", // Pakistan
-    "BD", // Bangladesh
-    "NG", // Nigeria
-    "AF", // Afghanistan
-    "CU", // Cuba
-    "IR", // Iran
-    "SD", // Sudan
-    "SY", // Syria
-  ];
+  // ✅ Restricted countries (PayPal limited)
+  const restrictedCountries = ["PK", "BD", "NG", "AF", "CU", "IR", "SD", "SY"];
 
   // ✅ Watch user auth
   useEffect(() => {
@@ -69,7 +60,7 @@ export default function CheckoutPage() {
     return () => unsub();
   }, [router]);
 
-  // ✅ Razorpay (India)
+  // ✅ Razorpay for India
   const handleRazorpay = async () => {
     if (!user) return alert("Please log in to continue checkout.");
     if (!accepted)
@@ -150,31 +141,66 @@ export default function CheckoutPage() {
     rzp.open();
   };
 
-  // ✅ PayPal (Outside India)
-  const handlePayPal = async () => {
-    if (!user) return alert("Please log in to continue checkout.");
-    if (!accepted)
-      return alert("Please accept the Terms & Refund Policy before proceeding.");
+  // ✅ PayPal Smart Buttons (Popup)
+  useEffect(() => {
+    if (currency === "INR" || !user) return; // Skip if India
+    const script = document.createElement("script");
+    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD`;
+    script.async = true;
+    script.onload = () => {
+      if (window.paypal && document.getElementById("paypal-button-container")) {
+        window.paypal.Buttons({
+          createOrder: async () => {
+            const res = await fetch("/api/create-paypal-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ amount: "1.99", currency: "USD" }),
+            });
+            const data = await res.json();
+            return data.id;
+          },
+          onApprove: async (data) => {
+            setProcessing(true);
+            const capture = await fetch("/api/capture-paypal-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: data.orderID,
+                userId: user.uid,
+              }),
+            });
+            const result = await capture.json();
 
-    setProcessing(true);
-    try {
-      const res = await fetch("/api/create-paypal-order", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: "1.99", currency: "USD" }),
-      });
+            if (result.success) {
+              await setDoc(
+                doc(db, "purchases", user.uid),
+                {
+                  hasAccess: true,
+                  paymentId: result.id,
+                  purchasedAt: new Date().toISOString(),
+                },
+                { merge: true }
+              );
 
-      const order = await res.json();
-      const approvalLink = order.links?.find((l) => l.rel === "approve")?.href;
-      if (!approvalLink) throw new Error("No approval link");
-      window.location.href = approvalLink;
-    } catch (err) {
-      console.error("PayPal error:", err);
-      alert("Could not start PayPal checkout. Please try again.");
-    } finally {
-      setProcessing(false);
-    }
-  };
+              localStorage.setItem(`${user.email}_access`, "true");
+              alert("Payment successful! Redirecting to dashboard...");
+              router.push("/dashboard");
+              setTimeout(() => window.location.reload(), 1000);
+            } else {
+              alert("Payment capture failed. Please contact support.");
+            }
+            setProcessing(false);
+          },
+          onError: (err) => {
+            console.error(err);
+            alert("PayPal payment failed. Please try again.");
+            setProcessing(false);
+          },
+        }).render("#paypal-button-container");
+      }
+    };
+    document.body.appendChild(script);
+  }, [currency, user, router]);
 
   if (loading)
     return (
@@ -252,29 +278,19 @@ export default function CheckoutPage() {
             onChange={(e) => setAccepted(e.target.checked)}
             className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
-          <label
-            htmlFor="terms"
-            className="ml-2 text-sm text-gray-600 select-none"
-          >
+          <label htmlFor="terms" className="ml-2 text-sm text-gray-600 select-none">
             I accept the{" "}
-            <a
-              href="/terms"
-              target="_blank"
-              className="text-blue-600 hover:underline"
-            >
+            <a href="/terms" target="_blank" className="text-blue-600 hover:underline">
               Terms & Conditions
             </a>{" "}
             and{" "}
-            <a
-              href="/refund-policy"
-              target="_blank"
-              className="text-blue-600 hover:underline"
-            >
+            <a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">
               Refund Policy
             </a>.
           </label>
         </div>
 
+        {/* Pay Buttons */}
         {currency === "INR" ? (
           <button
             onClick={handleRazorpay}
@@ -288,33 +304,23 @@ export default function CheckoutPage() {
             {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
           </button>
         ) : (
-          <button
-            onClick={handlePayPal}
-            disabled={processing}
-            className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
-              processing
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-yellow-500 hover:bg-yellow-600"
-            }`}
-          >
-            {processing ? "Processing..." : "Pay $1.99 via PayPal"}
-          </button>
-        )}
-
-        {/* ⚠️ Telegram Fallback for restricted */}
-        {restrictedCountries.includes(countryCode) && (
-          <p className="text-sm text-gray-800 mt-5 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-            ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
-            <a
-              href="https://t.me/htgstudio"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 font-bold hover:underline"
-            >
-              Contact us on Telegram
-            </a>{" "}
-            to pay via Binance, Payoneer, or your preferred method.
-          </p>
+          <>
+            <div id="paypal-button-container" className="w-full mt-3"></div>
+            {restrictedCountries.includes(countryCode) && (
+              <p className="text-sm text-gray-800 mt-5 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
+                <a
+                  href="https://t.me/htgstudio"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 font-bold hover:underline"
+                >
+                  Contact us on Telegram
+                </a>{" "}
+                to pay via Binance, Payoneer, or your preferred method.
+              </p>
+            )}
+          </>
         )}
 
         {showTelegramHint && (
