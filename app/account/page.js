@@ -20,7 +20,6 @@ if (typeof window !== "undefined") {
   const hasRefreshed = sessionStorage.getItem("accountRefreshed");
   if (!hasRefreshed) {
     sessionStorage.setItem("accountRefreshed", "true");
-    window.location.reload();
   }
 }
 
