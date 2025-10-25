@@ -14,7 +14,8 @@ import {
   browserLocalPersistence,
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
-// ✅ Force one-time page refresh to fix stale auth state
+
+// ✅ One-time refresh to fix stale auth (safe)
 if (typeof window !== "undefined") {
   const hasRefreshed = sessionStorage.getItem("accountRefreshed");
   if (!hasRefreshed) {
@@ -23,8 +24,7 @@ if (typeof window !== "undefined") {
   }
 }
 
-
-// ✅ Keep session persistent
+// ✅ Keep Firebase session persistent
 if (auth && typeof window !== "undefined") {
   setPersistence(auth, browserLocalPersistence).catch((err) =>
     console.warn("Persistence setup failed:", err)
@@ -46,7 +46,6 @@ export default function AccountPage() {
   useEffect(() => {
     if (typeof document !== "undefined" && document.referrer) {
       const referrer = document.referrer;
-      // only set if it's from the same domain
       if (referrer.includes(window.location.origin)) {
         setPreviousUrl(referrer);
       }
@@ -66,11 +65,14 @@ export default function AccountPage() {
             window.dispatchEvent(new Event("access-updated"));
           }
 
-          // ✅ Redirect logged-in user to previous page (if available)
-          if (previousUrl) {
+          // ✅ Redirect logic after successful auth
+          const fromCourses = previousUrl?.includes("/courses/phone-boost");
+          if (fromCourses) {
+            router.push("/checkout/phone-boost");
+          } else if (previousUrl) {
             window.location.href = previousUrl;
           } else {
-            router.back(); // fallback
+            router.back();
           }
         } catch (err) {
           console.warn("Access sync failed:", err);
@@ -80,14 +82,7 @@ export default function AccountPage() {
     return () => unsub();
   }, [previousUrl, router]);
 
-  // ✅ Next URL redirect
-  const getNextUrl = () => {
-    if (typeof window === "undefined") return "/";
-    const params = new URLSearchParams(window.location.search);
-    return params.get("next") || "/dashboard";
-  };
-
-  // ✅ Login
+  // ✅ Login handler
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -105,8 +100,11 @@ export default function AccountPage() {
       );
       window.dispatchEvent(new Event("access-updated"));
 
-      // ✅ Go back to previous page instead of dashboard
-      if (previousUrl) {
+      // ✅ Same redirect logic for login
+      const fromCourses = previousUrl?.includes("/courses/phone-boost");
+      if (fromCourses) {
+        router.push("/checkout/phone-boost");
+      } else if (previousUrl) {
         window.location.href = previousUrl;
       } else {
         router.back();
@@ -119,7 +117,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ Register → auto-login → go back
+  // ✅ Register handler
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
@@ -134,12 +132,13 @@ export default function AccountPage() {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
-
       localStorage.setItem(`${newUser.email}_access`, "false");
       window.dispatchEvent(new Event("access-updated"));
 
-      // ✅ Go back after signup
-      if (previousUrl) {
+      const fromCourses = previousUrl?.includes("/courses/phone-boost");
+      if (fromCourses) {
+        router.push("/checkout/phone-boost");
+      } else if (previousUrl) {
         window.location.href = previousUrl;
       } else {
         router.back();
@@ -171,8 +170,10 @@ export default function AccountPage() {
       localStorage.setItem(`${u.email}_access`, snap.exists() ? "true" : "false");
       window.dispatchEvent(new Event("access-updated"));
 
-      // ✅ Go back after Google sign-in
-      if (previousUrl) {
+      const fromCourses = previousUrl?.includes("/courses/phone-boost");
+      if (fromCourses) {
+        router.push("/checkout/phone-boost");
+      } else if (previousUrl) {
         window.location.href = previousUrl;
       } else {
         router.back();
@@ -193,6 +194,7 @@ export default function AccountPage() {
       Object.keys(localStorage).forEach((key) => {
         if (key.includes("_access")) localStorage.removeItem(key);
       });
+      sessionStorage.removeItem("accountRefreshed");
       setTimeout(() => window.location.reload(), 400);
     } catch (err) {
       console.error("Logout error:", err);
