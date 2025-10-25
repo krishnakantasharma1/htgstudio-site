@@ -76,6 +76,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                                     alert("Logout failed. Please try again.");
                         }
                     };
+                    //reloader
+                                         useEffect(() => {
+    const handlePopState = () => {
+      window.location.reload();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
 
                       return (
                           <html lang="en" className="light">
