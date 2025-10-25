@@ -52,11 +52,16 @@ export default function AccountPage() {
     }
   }, []);
 
-  // ✅ Helper: get ?next parameter
-  const getNextUrl = () => {
-    if (typeof window === "undefined") return null;
-    const params = new URLSearchParams(window.location.search);
-    return params.get("next");
+  // ✅ Redirect helper
+  const handleRedirectAfterLogin = (prev) => {
+    const fromCoursePage = prev?.includes("/course");
+    if (fromCoursePage) {
+      router.push("/checkout/phone-boost");
+    } else if (prev) {
+      window.location.href = prev;
+    } else {
+      router.back();
+    }
   };
 
   // ✅ Observe auth
@@ -72,19 +77,7 @@ export default function AccountPage() {
             window.dispatchEvent(new Event("access-updated"));
           }
 
-          // ✅ Redirect logic after successful auth
-          const next = getNextUrl();
-          const fromCourses = previousUrl?.includes("/courses/phone-boost");
-
-          if (next && next.startsWith("/")) {
-            router.push(next);
-          } else if (fromCourses) {
-            router.push("/checkout/phone-boost");
-          } else if (previousUrl) {
-            window.location.href = previousUrl;
-          } else {
-            router.back();
-          }
+          handleRedirectAfterLogin(previousUrl);
         } catch (err) {
           console.warn("Access sync failed:", err);
         }
@@ -111,18 +104,7 @@ export default function AccountPage() {
       );
       window.dispatchEvent(new Event("access-updated"));
 
-      const next = getNextUrl();
-      const fromCourses = previousUrl?.includes("/courses/phone-boost");
-
-      if (next && next.startsWith("/")) {
-        router.push(next);
-      } else if (fromCourses) {
-        router.push("/checkout/phone-boost");
-      } else if (previousUrl) {
-        window.location.href = previousUrl;
-      } else {
-        router.back();
-      }
+      handleRedirectAfterLogin(previousUrl);
     } catch (err) {
       console.error("Login error:", err);
       setError("Invalid email or password.");
@@ -149,18 +131,7 @@ export default function AccountPage() {
       localStorage.setItem(`${newUser.email}_access`, "false");
       window.dispatchEvent(new Event("access-updated"));
 
-      const next = getNextUrl();
-      const fromCourses = previousUrl?.includes("/courses/phone-boost");
-
-      if (next && next.startsWith("/")) {
-        router.push(next);
-      } else if (fromCourses) {
-        router.push("/checkout/phone-boost");
-      } else if (previousUrl) {
-        window.location.href = previousUrl;
-      } else {
-        router.back();
-      }
+      handleRedirectAfterLogin(previousUrl);
     } catch (err) {
       console.error("Registration failed:", err);
       if (err.code === "auth/email-already-in-use") {
@@ -188,18 +159,7 @@ export default function AccountPage() {
       localStorage.setItem(`${u.email}_access`, snap.exists() ? "true" : "false");
       window.dispatchEvent(new Event("access-updated"));
 
-      const next = getNextUrl();
-      const fromCourses = previousUrl?.includes("/courses/phone-boost");
-
-      if (next && next.startsWith("/")) {
-        router.push(next);
-      } else if (fromCourses) {
-        router.push("/checkout/phone-boost");
-      } else if (previousUrl) {
-        window.location.href = previousUrl;
-      } else {
-        router.back();
-      }
+      handleRedirectAfterLogin(previousUrl);
     } catch (err) {
       console.error("Google Sign-In failed:", err);
       setError("Google Sign-In failed. Try again.");
@@ -223,7 +183,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ UI (unchanged)
+  // ✅ UI (no changes)
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-gray-50 px-4">
       <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-md text-center border border-gray-100">
