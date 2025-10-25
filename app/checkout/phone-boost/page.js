@@ -141,8 +141,8 @@ export default function CheckoutPage() {
     rzp.open();
   };
 
- // ✅ PayPal Smart Buttons (Popup)
-// ✅ PayPal Smart Buttons (Popup with next/script safe load)
+
+// ✅ PayPal Smart Buttons (Popup + Terms Required)
 useEffect(() => {
   if (currency === "INR" || !user) return; // Skip for India
 
@@ -152,11 +152,25 @@ useEffect(() => {
     return;
   }
 
-  // Make sure we have a clean container
   const container = document.getElementById("paypal-button-container");
-  if (container) container.innerHTML = "";
+  if (!container) return;
 
-  const renderButtons = () => {
+  // Clear previous render before re-rendering
+  container.innerHTML = "";
+
+  // 🔐 Prevent rendering PayPal buttons until accepted
+  if (!accepted) {
+    const message = document.createElement("div");
+    message.innerHTML = `
+      <div style="color:#555;font-size:13px;padding:12px;border:1px solid #ddd;border-radius:8px;margin-top:8px;">
+        ⚠️ Please accept the Terms & Refund Policy before making a payment.
+      </div>`;
+    container.appendChild(message);
+    return;
+  }
+
+  // ✅ Function to safely render PayPal buttons
+  const renderPayPalButtons = () => {
     if (!window.paypal || !window.paypal.Buttons) {
       console.warn("⚠️ PayPal SDK not ready yet");
       return;
@@ -220,23 +234,26 @@ useEffect(() => {
     }
   };
 
-  // ✅ Check if SDK is already loaded
-  if (window.paypal) {
-    renderButtons();
-  } else {
-    // ✅ Load PayPal SDK via next/script
+  // ✅ Load PayPal SDK dynamically
+  const loadPayPalSDK = () => {
     const existing = document.querySelector('script[src*="www.paypal.com/sdk/js"]');
     if (!existing) {
       const script = document.createElement("script");
       script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`;
       script.async = true;
-      script.onload = renderButtons;
+      script.onload = renderPayPalButtons;
       document.body.appendChild(script);
     } else {
-      existing.addEventListener("load", renderButtons);
+      existing.addEventListener("load", renderPayPalButtons);
     }
+  };
+
+  if (window.paypal) {
+    renderPayPalButtons();
+  } else {
+    loadPayPalSDK();
   }
-}, [currency, user, router]);
+}, [currency, user, router, accepted]); // 👈 added "accepted" dependency
 
   if (loading)
     return (
