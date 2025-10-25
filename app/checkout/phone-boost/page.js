@@ -212,7 +212,7 @@ export default function CheckoutPage() {
           <p>🌍 You’re accessing from <span className="font-semibold">{country}</span></p>
           <p>💳 Price: <span className="font-semibold text-blue-600">{currency === "INR" ? "₹175" : "$1.99"}</span> (one-time payment)</p>
           {currency !== "INR" && (
-            <p className="text-green-600 mt-1">🌐 International users can pay using <b>PayPal</b> via Razorpay wallet.</p>
+            <p className="text-green-600 mt-1">🌐 You users can pay using <b>PayPal</b> via Razorpay wallet.</p>
           )}
         </div>
 
