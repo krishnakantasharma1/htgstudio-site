@@ -32,6 +32,18 @@ export default function AccountPage() {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // ✅ Detect previous page
+  const [previousUrl, setPreviousUrl] = useState(null);
+  useEffect(() => {
+    if (typeof document !== "undefined" && document.referrer) {
+      const referrer = document.referrer;
+      // only set if it's from the same domain
+      if (referrer.includes(window.location.origin)) {
+        setPreviousUrl(referrer);
+      }
+    }
+  }, []);
+
   // ✅ Observe auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -44,13 +56,20 @@ export default function AccountPage() {
             localStorage.setItem(`${u.email}_access`, "true");
             window.dispatchEvent(new Event("access-updated"));
           }
+
+          // ✅ Redirect logged-in user to previous page (if available)
+          if (previousUrl) {
+            window.location.href = previousUrl;
+          } else {
+            router.back(); // fallback
+          }
         } catch (err) {
           console.warn("Access sync failed:", err);
         }
       }
     });
     return () => unsub();
-  }, []);
+  }, [previousUrl, router]);
 
   // ✅ Next URL redirect
   const getNextUrl = () => {
@@ -77,8 +96,12 @@ export default function AccountPage() {
       );
       window.dispatchEvent(new Event("access-updated"));
 
-      router.push("/dashboard");
-      setTimeout(() => window.location.reload(), 500);
+      // ✅ Go back to previous page instead of dashboard
+      if (previousUrl) {
+        window.location.href = previousUrl;
+      } else {
+        router.back();
+      }
     } catch (err) {
       console.error("Login error:", err);
       setError("Invalid email or password.");
@@ -87,7 +110,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ Register → auto-login → redirect
+  // ✅ Register → auto-login → go back
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
@@ -103,13 +126,15 @@ export default function AccountPage() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // Default access false until purchase
       localStorage.setItem(`${newUser.email}_access`, "false");
       window.dispatchEvent(new Event("access-updated"));
 
-      // ✅ Auto redirect to dashboard (already logged in)
-      router.push("/dashboard");
-      setTimeout(() => window.location.reload(), 500);
+      // ✅ Go back after signup
+      if (previousUrl) {
+        window.location.href = previousUrl;
+      } else {
+        router.back();
+      }
     } catch (err) {
       console.error("Registration failed:", err);
       if (err.code === "auth/email-already-in-use") {
@@ -136,7 +161,13 @@ export default function AccountPage() {
       const snap = await getDoc(ref);
       localStorage.setItem(`${u.email}_access`, snap.exists() ? "true" : "false");
       window.dispatchEvent(new Event("access-updated"));
-      router.push(getNextUrl());
+
+      // ✅ Go back after Google sign-in
+      if (previousUrl) {
+        window.location.href = previousUrl;
+      } else {
+        router.back();
+      }
     } catch (err) {
       console.error("Google Sign-In failed:", err);
       setError("Google Sign-In failed. Try again.");
@@ -159,7 +190,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ UI
+  // ✅ UI (unchanged)
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-gray-50 px-4">
       <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-md text-center border border-gray-100">
