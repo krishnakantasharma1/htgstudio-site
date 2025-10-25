@@ -10,12 +10,13 @@ import Image from "next/image";
 export default function CheckoutPage() {
   const [user, setUser] = useState(null);
   const [country, setCountry] = useState("");
+  const [countryCode, setCountryCode] = useState("");
   const [currency, setCurrency] = useState("INR");
   const [loading, setLoading] = useState(true);
   const [hasAccess, setHasAccess] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [showTelegramHint, setShowTelegramHint] = useState(false); // 👈 hover msg state
+  const [showTelegramHint, setShowTelegramHint] = useState(false);
   const router = useRouter();
 
   // ✅ Detect country via IP
@@ -24,6 +25,7 @@ export default function CheckoutPage() {
       .then((res) => res.json())
       .then((data) => {
         setCountry(data.country_name || "Unknown");
+        setCountryCode(data.country_code || "");
         if (data.country_code && data.country_code !== "IN") {
           setCurrency("USD");
         }
@@ -31,6 +33,18 @@ export default function CheckoutPage() {
       .catch(() => setCountry("Unknown"))
       .finally(() => setLoading(false));
   }, []);
+
+  // ✅ Restricted countries where PayPal may not work
+  const restrictedCountries = [
+    "PK", // Pakistan
+    "BD", // Bangladesh
+    "NG", // Nigeria
+    "AF", // Afghanistan
+    "CU", // Cuba
+    "IR", // Iran
+    "SD", // Sudan
+    "SY", // Syria
+  ];
 
   // ✅ Watch user auth
   useEffect(() => {
@@ -55,64 +69,43 @@ export default function CheckoutPage() {
     return () => unsub();
   }, [router]);
 
-  // ✅ Razorpay payment
-  const handlePayment = async () => {
-    if (!user) {
-      alert("Please log in to continue checkout.");
-      return;
-    }
-
-    if (!accepted) {
-      alert("Please accept the Terms, Conditions, and Refund Policy before proceeding.");
-      return;
-    }
-
-    const priceINR = 1;
-    const priceUSD = 1.99;
-    const amount = currency === "INR" ? priceINR : priceUSD;
+  // ✅ Razorpay (India)
+  const handleRazorpay = async () => {
+    if (!user) return alert("Please log in to continue checkout.");
+    if (!accepted)
+      return alert("Please accept the Terms & Refund Policy before proceeding.");
 
     setProcessing(true);
-    setShowTelegramHint(false); // reset hint
+    setShowTelegramHint(false);
 
     const res = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        amount,
-        currency,
-        userId: user?.uid,
+        amount: 175,
+        currency: "INR",
+        userId: user.uid,
       }),
     });
 
     const data = await res.json();
     if (!data.success || !data.order) {
       alert("Failed to create order. Please try again.");
-      console.error(data.error);
       setProcessing(false);
       return;
     }
 
     const order = data.order;
-    const razorpayKey = "rzp_live_RW88YpfthOTT67";
-
-    const options = {
-      key: razorpayKey,
+    const rzp = new window.Razorpay({
+      key: "rzp_live_RW88YpfthOTT67",
       amount: order.amount,
       currency: order.currency,
       name: "HTG Studio",
       description: "Phone Boost Course",
       image: "/logo.png",
       order_id: order.id,
-
-      handler: async function (response) {
+      handler: async (response) => {
         try {
-          const activeUser = auth.currentUser;
-          if (!activeUser) {
-            alert("Payment succeeded, but no user detected. Please contact support.");
-            return;
-          }
-
-          // 🔹 Verify payment on server
           const verifyRes = await fetch("/api/verify-payment", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -120,22 +113,15 @@ export default function CheckoutPage() {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
-              userId: activeUser.uid,
+              userId: user.uid,
             }),
           });
-
           const verifyData = await verifyRes.json();
+          if (!verifyData.success)
+            return alert("Payment verification failed. Please contact support.");
 
-          if (!verifyData.success) {
-            alert("⚠️ Payment verification failed. Please contact support.");
-            setProcessing(false);
-            return;
-          }
-
-          // 🔹 Verified → save purchase
-          const purchaseRef = doc(db, "purchases", activeUser.uid);
           await setDoc(
-            purchaseRef,
+            doc(db, "purchases", user.uid),
             {
               hasAccess: true,
               paymentId: response.razorpay_payment_id,
@@ -144,33 +130,50 @@ export default function CheckoutPage() {
             { merge: true }
           );
 
-          localStorage.setItem(`${activeUser.email}_access`, "true");
-          window.dispatchEvent(new Event("access-updated"));
-
-          alert("Payment successful! Redirecting to your dashboard...");
+          localStorage.setItem(`${user.email}_access`, "true");
+          alert("Payment successful! Redirecting...");
           router.push("/dashboard");
           setTimeout(() => window.location.reload(), 1000);
         } catch (err) {
-          console.error("❌ Error verifying or writing to Firestore:", err);
-          alert("Payment succeeded, but verification failed. Please contact support.");
+          console.error(err);
+          alert("Payment succeeded but verification failed. Contact support.");
         } finally {
           setProcessing(false);
         }
       },
-
       modal: {
-        ondismiss: function () {
-          // 👇 When user exits Razorpay popup, show Telegram hint
-          setShowTelegramHint(true);
-        },
+        ondismiss: () => setShowTelegramHint(true),
       },
-
-      prefill: { email: user?.email || "" },
+      prefill: { email: user.email || "" },
       theme: { color: "#2563eb" },
-    };
-
-    const rzp = new window.Razorpay(options);
+    });
     rzp.open();
+  };
+
+  // ✅ PayPal (Outside India)
+  const handlePayPal = async () => {
+    if (!user) return alert("Please log in to continue checkout.");
+    if (!accepted)
+      return alert("Please accept the Terms & Refund Policy before proceeding.");
+
+    setProcessing(true);
+    try {
+      const res = await fetch("/api/create-paypal-order", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amount: "1.99", currency: "USD" }),
+      });
+
+      const order = await res.json();
+      const approvalLink = order.links?.find((l) => l.rel === "approve")?.href;
+      if (!approvalLink) throw new Error("No approval link");
+      window.location.href = approvalLink;
+    } catch (err) {
+      console.error("PayPal error:", err);
+      alert("Could not start PayPal checkout. Please try again.");
+    } finally {
+      setProcessing(false);
+    }
   };
 
   if (loading)
@@ -181,13 +184,23 @@ export default function CheckoutPage() {
       </div>
     );
 
-  if (hasAccess) {
+  if (hasAccess)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-md p-8 text-center">
-          <Image src="/course-phone.jpg" alt="Phone Boost Course" width={600} height={300} className="rounded-xl mb-5 object-cover mx-auto" />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">You already own this course 🎉</h1>
-          <p className="text-gray-600 mb-6">You can access your content anytime from your dashboard.</p>
+          <Image
+            src="/course-phone.jpg"
+            alt="Phone Boost Course"
+            width={600}
+            height={300}
+            className="rounded-xl mb-5 object-cover mx-auto"
+          />
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            You already own this course 🎉
+          </h1>
+          <p className="text-gray-600 mb-6">
+            You can access your content anytime from your dashboard.
+          </p>
           <button
             onClick={() => router.push("/dashboard")}
             className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-sm hover:shadow-md"
@@ -197,23 +210,38 @@ export default function CheckoutPage() {
         </div>
       </div>
     );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-md p-6 sm:p-8 text-center relative">
-        <Image src="/course-phone.jpg" alt="Phone Boost Course" width={600} height={300} className="rounded-xl mb-5 object-cover mx-auto" />
+        <Image
+          src="/course-phone.jpg"
+          alt="Phone Boost Course"
+          width={600}
+          height={300}
+          className="rounded-xl mb-5 object-cover mx-auto"
+        />
 
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Phone Boost Masterclass</h1>
-        <p className="text-gray-600 mb-6 text-sm">Make your phone faster, smoother, and extend its battery life.</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          Phone Boost Masterclass
+        </h1>
+        <p className="text-gray-600 mb-6 text-sm">
+          Make your phone faster, smoother, and extend its battery life.
+        </p>
 
         <div className="bg-gray-50 rounded-lg p-3 mb-6 text-sm text-gray-700 border">
-          <p>🌍 You’re accessing from <span className="font-semibold">{country}</span></p>
-          <p>💳 Price: <span className="font-semibold text-blue-600">{currency === "INR" ? "₹175" : "$1.99"}</span> (one-time payment)</p>
-          {currency !== "INR" && (
-            <p className="text-green-600 mt-1">🌐 You users can pay using <b>PayPal</b> via Razorpay wallet.</p>
-          )}
+          <p>
+            🌍 You’re accessing from{" "}
+            <span className="font-semibold">{country}</span>
+          </p>
+          <p>
+            💳 Price:{" "}
+            <span className="font-semibold text-blue-600">
+              {currency === "INR" ? "₹175" : "$1.99"}
+            </span>{" "}
+            (one-time payment)
+          </p>
         </div>
 
         <div className="flex items-center mb-4 text-left">
@@ -224,43 +252,71 @@ export default function CheckoutPage() {
             onChange={(e) => setAccepted(e.target.checked)}
             className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
-          <label htmlFor="terms" className="ml-2 text-sm text-gray-600 select-none">
+          <label
+            htmlFor="terms"
+            className="ml-2 text-sm text-gray-600 select-none"
+          >
             I accept the{" "}
-            <a href="/terms" target="_blank" className="text-blue-600 hover:underline">Terms & Conditions</a> and{" "}
-            
-            <span className="text-blue-600 hover:underline cursor-default">Refund</span>{' '}
-<a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">
-  Policy
-</a>.
+            <a
+              href="/terms"
+              target="_blank"
+              className="text-blue-600 hover:underline"
+            >
+              Terms & Conditions
+            </a>{" "}
+            and{" "}
+            <a
+              href="/refund-policy"
+              target="_blank"
+              className="text-blue-600 hover:underline"
+            >
+              Refund Policy
+            </a>.
           </label>
         </div>
 
-        <button
-          onClick={handlePayment}
-          disabled={processing}
-          className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
-            processing ? "bg-gray-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          {processing ? "Processing..." : `Pay ${currency === "INR" ? "₹175" : "$1.99"} Now`}
-        </button>
+        {currency === "INR" ? (
+          <button
+            onClick={handleRazorpay}
+            disabled={processing}
+            className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
+              processing
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-blue-600 hover:bg-blue-700"
+            }`}
+          >
+            {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
+          </button>
+        ) : (
+          <button
+            onClick={handlePayPal}
+            disabled={processing}
+            className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
+              processing
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-yellow-500 hover:bg-yellow-600"
+            }`}
+          >
+            {processing ? "Processing..." : "Pay $1.99 via PayPal"}
+          </button>
+        )}
 
-        {/* 👇 Telegram contact message */}
-        <p className="text-sm text-gray-800 mt-5 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-  Can’t complete your payment using the available methods?{" "}
-  <a
-    href="https://t.me/htgstudio"
-    target="_blank"
-    rel="noopener noreferrer"
-    className="text-blue-600 font-bold hover:underline"
-  >
-    Contact us on Telegram
-  </a>
-  .
-</p>
+        {/* ⚠️ Telegram Fallback for restricted */}
+        {restrictedCountries.includes(countryCode) && (
+          <p className="text-sm text-gray-800 mt-5 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+            ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
+            <a
+              href="https://t.me/htgstudio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 font-bold hover:underline"
+            >
+              Contact us on Telegram
+            </a>{" "}
+            to pay via Binance, Payoneer, or your preferred method.
+          </p>
+        )}
 
-
-        {/* 👇 Popup exit hint */}
         {showTelegramHint && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-bounce">
             💬 Can’t complete your payment using the available methods? Contact us on Telegram @htgstudio
