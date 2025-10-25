@@ -16,28 +16,26 @@ export default function CheckoutPage() {
   const [hasAccess, setHasAccess] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [showTelegramHint, setShowTelegramHint] = useState(false);
+  const [infoMessage, setInfoMessage] = useState(""); // 💬 blue info msg
+  const [hoverMessage, setHoverMessage] = useState(false); // 💬 floating hover msg
   const router = useRouter();
 
-  // ✅ Detect country via IP
+  // ✅ Detect user country
   useEffect(() => {
     fetch("https://ipapi.co/json/")
       .then((res) => res.json())
       .then((data) => {
         setCountry(data.country_name || "Unknown");
         setCountryCode(data.country_code || "");
-        if (data.country_code && data.country_code !== "IN") {
-          setCurrency("USD");
-        }
+        if (data.country_code && data.country_code !== "IN") setCurrency("USD");
       })
       .catch(() => setCountry("Unknown"))
       .finally(() => setLoading(false));
   }, []);
 
-  // ✅ Restricted countries (PayPal limited)
   const restrictedCountries = ["PK", "BD", "NG", "AF", "CU", "IR", "SD", "SY"];
 
-  // ✅ Watch user auth
+  // ✅ Watch Firebase Auth
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) {
@@ -45,7 +43,6 @@ export default function CheckoutPage() {
         return;
       }
       setUser(u);
-
       try {
         const ref = doc(db, "purchases", u.uid);
         const snap = await getDoc(ref);
@@ -54,34 +51,31 @@ export default function CheckoutPage() {
           localStorage.setItem(`${u.email}_access`, "true");
         }
       } catch (err) {
-        console.error("Error reading Firestore:", err);
+        console.error("Firestore error:", err);
       }
     });
     return () => unsub();
   }, [router]);
 
-  // ✅ Razorpay for India
+  // ✅ Razorpay Payment
   const handleRazorpay = async () => {
-    if (!user) return alert("Please log in to continue checkout.");
-    if (!accepted)
-      return alert("Please accept the Terms & Refund Policy before proceeding.");
+    if (!accepted) {
+      setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
+      setTimeout(() => setInfoMessage(""), 4000);
+      return;
+    }
+    if (!user) return alert("Please log in first.");
 
     setProcessing(true);
-    setShowTelegramHint(false);
-
     const res = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        amount: 1,
-        currency: "INR",
-        userId: user.uid,
-      }),
+      body: JSON.stringify({ amount: 1, currency: "INR", userId: user.uid }),
     });
 
     const data = await res.json();
-    if (!data.success || !data.order) {
-      alert("Failed to create order. Please try again.");
+    if (!data.success) {
+      setHoverMessage(true);
       setProcessing(false);
       return;
     }
@@ -108,8 +102,11 @@ export default function CheckoutPage() {
             }),
           });
           const verifyData = await verifyRes.json();
-          if (!verifyData.success)
-            return alert("Payment verification failed. Please contact support.");
+          if (!verifyData.success) {
+            setHoverMessage(true);
+            setProcessing(false);
+            return;
+          }
 
           await setDoc(
             doc(db, "purchases", user.uid),
@@ -122,142 +119,102 @@ export default function CheckoutPage() {
           );
 
           localStorage.setItem(`${user.email}_access`, "true");
-          alert("Payment successful! Redirecting...");
+          alert("✅ Payment successful! Redirecting...");
           router.push("/dashboard");
           setTimeout(() => window.location.reload(), 1000);
-        } catch (err) {
-          console.error(err);
-          alert("Payment succeeded but verification failed. Contact support.");
+        } catch {
+          setHoverMessage(true);
         } finally {
           setProcessing(false);
         }
       },
       modal: {
-        ondismiss: () => setShowTelegramHint(true),
+        ondismiss: () => setHoverMessage(true),
       },
-      prefill: { email: user.email || "" },
+      prefill: { email: user.email },
       theme: { color: "#2563eb" },
     });
     rzp.open();
   };
 
+  // ✅ PayPal Buttons
+  useEffect(() => {
+    if (currency === "INR" || !user) return;
 
-// ✅ PayPal Smart Buttons (Popup + Terms Required)
-useEffect(() => {
-  if (currency === "INR" || !user) return; // Skip for India
+    const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+    const container = document.getElementById("paypal-button-container");
+    if (!container) return;
+    container.innerHTML = "";
 
-  const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-  if (!PAYPAL_CLIENT_ID) {
-    console.error("❌ Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID in .env.local");
-    return;
-  }
-
-  const container = document.getElementById("paypal-button-container");
-  if (!container) return;
-
-  // Clear previous render before re-rendering
-  container.innerHTML = "";
-
-  // 🔐 Prevent rendering PayPal buttons until accepted
-  if (!accepted) {
-    const message = document.createElement("div");
-    message.innerHTML = `
-      <div style="color:#555;font-size:13px;padding:12px;border:1px solid #ddd;border-radius:8px;margin-top:8px;">
-        ⚠️ Please accept the Terms & Refund Policy before making a payment.
-      </div>`;
-    container.appendChild(message);
-    return;
-  }
-
-  // ✅ Function to safely render PayPal buttons
-  const renderPayPalButtons = () => {
-    if (!window.paypal || !window.paypal.Buttons) {
-      console.warn("⚠️ PayPal SDK not ready yet");
+    if (!accepted) {
+      container.innerHTML = `
+        <div style="color:#444;font-size:13px;padding:10px;border:1px solid #ddd;border-radius:8px;margin-top:8px;">
+          ⚠️ Please accept the Terms & Refund Policy before making a payment.
+        </div>`;
       return;
     }
 
-    try {
-      window.paypal
-        .Buttons({
-          style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
+    const renderButtons = () => {
+      if (window.paypal && window.paypal.Buttons) {
+        window.paypal
+          .Buttons({
+            style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
+            createOrder: async () => {
+              const res = await fetch("/api/create-paypal-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ amount: "1.99", currency: "USD" }),
+              });
+              const data = await res.json();
+              return data.id;
+            },
+            onApprove: async (data) => {
+              setProcessing(true);
+              const capture = await fetch("/api/capture-paypal-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
+              });
+              const result = await capture.json();
+              if (result.success) {
+                await setDoc(
+                  doc(db, "purchases", user.uid),
+                  {
+                    hasAccess: true,
+                    paymentId: result.id,
+                    purchasedAt: new Date().toISOString(),
+                  },
+                  { merge: true }
+                );
+                localStorage.setItem(`${user.email}_access`, "true");
+                alert("✅ Payment successful! Redirecting...");
+                router.push("/dashboard");
+                setTimeout(() => window.location.reload(), 1000);
+              } else {
+                setHoverMessage(true);
+              }
+              setProcessing(false);
+            },
+            onError: () => setHoverMessage(true),
+          })
+          .render("#paypal-button-container");
+      }
+    };
 
-          createOrder: async () => {
-            const res = await fetch("/api/create-paypal-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ amount: "1.99", currency: "USD" }),
-            });
-            const data = await res.json();
-            return data.id;
-          },
-
-          onApprove: async (data) => {
-            setProcessing(true);
-            const capture = await fetch("/api/capture-paypal-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
-            });
-            const result = await capture.json();
-
-            if (result.success) {
-              await setDoc(
-                doc(db, "purchases", user.uid),
-                {
-                  hasAccess: true,
-                  paymentId: result.id,
-                  purchasedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
-
-              localStorage.setItem(`${user.email}_access`, "true");
-              alert("✅ Payment successful! Redirecting...");
-              router.push("/dashboard");
-              setTimeout(() => window.location.reload(), 1000);
-            } else {
-              alert("⚠️ Payment capture failed. Please contact support.");
-            }
-
-            setProcessing(false);
-          },
-
-          onError: (err) => {
-            console.error("PayPal error:", err);
-            alert("PayPal payment failed. Please try again.");
-            setProcessing(false);
-          },
-        })
-        .render("#paypal-button-container");
-    } catch (err) {
-      console.error("💥 Failed to render PayPal buttons:", err);
-    }
-  };
-
-  // ✅ Load PayPal SDK dynamically
-  const loadPayPalSDK = () => {
-    const existing = document.querySelector('script[src*="www.paypal.com/sdk/js"]');
-    if (!existing) {
+    if (!window.paypal) {
       const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`;
-      script.async = true;
-      script.onload = renderPayPalButtons;
+      script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+      script.onload = renderButtons;
       document.body.appendChild(script);
     } else {
-      existing.addEventListener("load", renderPayPalButtons);
+      renderButtons();
     }
-  };
+  }, [currency, user, accepted, router]);
 
-  if (window.paypal) {
-    renderPayPalButtons();
-  } else {
-    loadPayPalSDK();
-  }
-}, [currency, user, router, accepted]); // 👈 added "accepted" dependency
-
+  // ✅ Already purchased
   if (loading)
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-600">
+      <div className="flex flex-col items-center justify-center min-h-screen text-gray-600">
         <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
         Detecting your location...
       </div>
@@ -265,24 +222,14 @@ useEffect(() => {
 
   if (hasAccess)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-md p-8 text-center">
-          <Image
-            src="/course-phone.jpg"
-            alt="Phone Boost Course"
-            width={600}
-            height={300}
-            className="rounded-xl mb-5 object-cover mx-auto"
-          />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            You already own this course 🎉
-          </h1>
-          <p className="text-gray-600 mb-6">
-            You can access your content anytime from your dashboard.
-          </p>
+      <div className="flex justify-center items-center min-h-screen bg-gray-50">
+        <div className="bg-white p-8 rounded-2xl shadow-md text-center">
+          <Image src="/course-phone.jpg" alt="Course" width={600} height={300} className="rounded-xl mb-5 object-cover mx-auto" />
+          <h1 className="text-3xl font-bold mb-2">You already own this course 🎉</h1>
+          <p className="text-gray-600 mb-6">Access your content anytime from your dashboard.</p>
           <button
             onClick={() => router.push("/dashboard")}
-            className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition shadow-sm hover:shadow-md"
+            className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition"
           >
             Go to Dashboard
           </button>
@@ -290,39 +237,21 @@ useEffect(() => {
       </div>
     );
 
+  // ✅ Checkout UI
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 relative">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-md p-6 sm:p-8 text-center relative">
-        <Image
-          src="/course-phone.jpg"
-          alt="Phone Boost Course"
-          width={600}
-          height={300}
-          className="rounded-xl mb-5 object-cover mx-auto"
-        />
-
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          Phone Boost Masterclass
-        </h1>
-        <p className="text-gray-600 mb-6 text-sm">
-          Make your phone faster, smoother, and extend its battery life.
-        </p>
+        <Image src="/course-phone.jpg" alt="Phone Boost Course" width={600} height={300} className="rounded-xl mb-5 object-cover mx-auto" />
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Phone Boost Masterclass</h1>
+        <p className="text-gray-600 mb-6 text-sm">Make your phone faster, smoother, and extend its battery life.</p>
 
         <div className="bg-gray-50 rounded-lg p-3 mb-6 text-sm text-gray-700 border">
-          <p>
-            🌍 You’re accessing from{" "}
-            <span className="font-semibold">{country}</span>
-          </p>
-          <p>
-            💳 Price:{" "}
-            <span className="font-semibold text-blue-600">
-              {currency === "INR" ? "₹175" : "$1.99"}
-            </span>{" "}
-            (one-time payment)
-          </p>
+          <p>🌍 You’re accessing from <span className="font-semibold">{country}</span></p>
+          <p>💳 Price: <span className="font-semibold text-blue-600">{currency === "INR" ? "₹175" : "$1.99"}</span> (one-time payment)</p>
         </div>
 
+        {/* ✅ Terms */}
         <div className="flex items-center mb-4 text-left">
           <input
             id="terms"
@@ -331,82 +260,48 @@ useEffect(() => {
             onChange={(e) => setAccepted(e.target.checked)}
             className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
           />
-          <label htmlFor="terms" className="ml-2 text-sm text-gray-600 select-none">
+          <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
             I accept the{" "}
-            <a href="/terms" target="_blank" className="text-blue-600 hover:underline">
-              Terms & Conditions
-            </a>{" "}
-            and{" "}
-            <a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">
-              Refund Policy
-            </a>.
+            <a href="/terms" target="_blank" className="text-blue-600 hover:underline">Terms & Conditions</a> and{" "}
+            <a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">Refund Policy</a>.
           </label>
         </div>
 
-        {/* ✅ Payment Buttons Section */}
-{currency === "INR" ? (
-  <>
-    {/* Razorpay Button */}
-    <button
-      onClick={() => {
-        if (!accepted) return; // Prevent payment if not accepted
-        handleRazorpay();
-      }}
-      disabled={processing}
-      className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
-        processing
-          ? "bg-gray-400 cursor-not-allowed"
-          : accepted
-          ? "bg-blue-600 hover:bg-blue-700"
-          : "bg-blue-400 cursor-not-allowed"
-      }`}
-    >
-      {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
-    </button>
+        {/* ✅ Buttons */}
+        {currency === "INR" ? (
+          <button
+            onClick={handleRazorpay}
+            disabled={processing}
+            className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+          >
+            {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
+          </button>
+        ) : (
+          <>
+            <div id="paypal-button-container" className="w-full mt-3"></div>
+            {restrictedCountries.includes(countryCode) && (
+              <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+                ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
+                <a href="https://t.me/htgstudio" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">
+                  Contact us on Telegram
+                </a>{" "}
+                to pay via Binance, Payoneer, or your preferred method.
+              </p>
+            )}
+          </>
+        )}
 
-    {/* Message if terms not accepted */}
-    {!accepted && (
-      <p className="text-sm text-gray-800 mt-3 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-        ⚠️ Please accept the <b>Terms & Conditions</b> and <b>Refund Policy</b> before making a payment.
-      </p>
-    )}
-  </>
-) : (
-  <>
-    {/* PayPal Button */}
-    <div
-      id="paypal-button-container"
-      className={`w-full mt-3 ${!accepted ? "opacity-60 pointer-events-none" : ""}`}
-    ></div>
+        {/* 💬 Info Message */}
+        {infoMessage && (
+          <p className="text-sm text-gray-800 mt-4 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 transition">
+            {infoMessage}
+          </p>
+        )}
 
-    {/* Message if terms not accepted */}
-    {!accepted && (
-      <p className="text-sm text-gray-800 mt-3 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-        ⚠️ Please accept the <b>Terms & Conditions</b> and <b>Refund Policy</b> before making a payment.
-      </p>
-    )}
-
-    {/* Restricted country fallback message */}
-    {restrictedCountries.includes(countryCode) && (
-      <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-        ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
-        <a
-          href="https://t.me/htgstudio"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-blue-600 font-bold hover:underline"
-        >
-          Contact us on Telegram
-        </a>{" "}
-        to pay via Binance, Payoneer, or your preferred method.
-      </p>
-    )}
-  </>
-)}
-
-        {showTelegramHint && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-bounce">
-            💬 Can’t complete your payment using the available methods? Contact us on Telegram @htgstudio
+        {/* 💬 Hover Message for Failures */}
+        {hoverMessage && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg">
+            💬 Payment failed or cancelled. Contact us on Telegram @htgstudio
           </div>
         )}
       </div>
