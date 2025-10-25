@@ -16,11 +16,10 @@ export default function CheckoutPage() {
   const [hasAccess, setHasAccess] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [infoMessage, setInfoMessage] = useState(""); // 💬 blue info msg
-  const [hoverMessage, setHoverMessage] = useState(false); // 💬 floating hover msg
+  const [infoMessage, setInfoMessage] = useState(""); // inline message
   const router = useRouter();
 
-  // ✅ Detect user country
+  // ✅ Detect country via IP
   useEffect(() => {
     fetch("https://ipapi.co/json/")
       .then((res) => res.json())
@@ -57,7 +56,7 @@ export default function CheckoutPage() {
     return () => unsub();
   }, [router]);
 
-  // ✅ Razorpay Payment
+  // ✅ Razorpay payment
   const handleRazorpay = async () => {
     if (!accepted) {
       setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
@@ -67,6 +66,7 @@ export default function CheckoutPage() {
     if (!user) return alert("Please log in first.");
 
     setProcessing(true);
+
     const res = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -75,7 +75,6 @@ export default function CheckoutPage() {
 
     const data = await res.json();
     if (!data.success) {
-      setHoverMessage(true);
       setProcessing(false);
       return;
     }
@@ -102,12 +101,7 @@ export default function CheckoutPage() {
             }),
           });
           const verifyData = await verifyRes.json();
-          if (!verifyData.success) {
-            setHoverMessage(true);
-            setProcessing(false);
-            return;
-          }
-
+          if (!verifyData.success) return;
           await setDoc(
             doc(db, "purchases", user.uid),
             {
@@ -117,19 +111,18 @@ export default function CheckoutPage() {
             },
             { merge: true }
           );
-
           localStorage.setItem(`${user.email}_access`, "true");
           alert("✅ Payment successful! Redirecting...");
           router.push("/dashboard");
           setTimeout(() => window.location.reload(), 1000);
         } catch {
-          setHoverMessage(true);
+          console.error("Payment verification failed.");
         } finally {
           setProcessing(false);
         }
       },
       modal: {
-        ondismiss: () => setHoverMessage(true),
+        ondismiss: () => setInfoMessage("⚠️ Payment cancelled. Please try again or contact us."),
       },
       prefill: { email: user.email },
       theme: { color: "#2563eb" },
@@ -137,7 +130,7 @@ export default function CheckoutPage() {
     rzp.open();
   };
 
-  // ✅ PayPal Buttons
+  // ✅ PayPal Button (always visible)
   useEffect(() => {
     if (currency === "INR" || !user) return;
 
@@ -145,14 +138,6 @@ export default function CheckoutPage() {
     const container = document.getElementById("paypal-button-container");
     if (!container) return;
     container.innerHTML = "";
-
-    if (!accepted) {
-      container.innerHTML = `
-        <div style="color:#444;font-size:13px;padding:10px;border:1px solid #ddd;border-radius:8px;margin-top:8px;">
-          ⚠️ Please accept the Terms & Refund Policy before making a payment.
-        </div>`;
-      return;
-    }
 
     const renderButtons = () => {
       if (window.paypal && window.paypal.Buttons) {
@@ -169,6 +154,11 @@ export default function CheckoutPage() {
               return data.id;
             },
             onApprove: async (data) => {
+              if (!accepted) {
+                setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
+                setTimeout(() => setInfoMessage(""), 4000);
+                return;
+              }
               setProcessing(true);
               const capture = await fetch("/api/capture-paypal-order", {
                 method: "POST",
@@ -191,11 +181,12 @@ export default function CheckoutPage() {
                 router.push("/dashboard");
                 setTimeout(() => window.location.reload(), 1000);
               } else {
-                setHoverMessage(true);
+                setInfoMessage("⚠️ Payment failed. Please contact us on Telegram @htgstudio.");
               }
               setProcessing(false);
             },
-            onError: () => setHoverMessage(true),
+            onError: () =>
+              setInfoMessage("⚠️ Something went wrong. Contact us on Telegram @htgstudio."),
           })
           .render("#paypal-button-container");
       }
@@ -211,7 +202,6 @@ export default function CheckoutPage() {
     }
   }, [currency, user, accepted, router]);
 
-  // ✅ Already purchased
   if (loading)
     return (
       <div className="flex flex-col items-center justify-center min-h-screen text-gray-600">
@@ -237,7 +227,6 @@ export default function CheckoutPage() {
       </div>
     );
 
-  // ✅ Checkout UI
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4 sm:px-6 relative">
       <Script src="https://checkout.razorpay.com/v1/checkout.js" />
@@ -251,7 +240,6 @@ export default function CheckoutPage() {
           <p>💳 Price: <span className="font-semibold text-blue-600">{currency === "INR" ? "₹175" : "$1.99"}</span> (one-time payment)</p>
         </div>
 
-        {/* ✅ Terms */}
         <div className="flex items-center mb-4 text-left">
           <input
             id="terms"
@@ -267,7 +255,6 @@ export default function CheckoutPage() {
           </label>
         </div>
 
-        {/* ✅ Buttons */}
         {currency === "INR" ? (
           <button
             onClick={handleRazorpay}
@@ -277,33 +264,34 @@ export default function CheckoutPage() {
             {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
           </button>
         ) : (
-          <>
-            <div id="paypal-button-container" className="w-full mt-3"></div>
-            {restrictedCountries.includes(countryCode) && (
-              <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-                ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
-                <a href="https://t.me/htgstudio" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">
-                  Contact us on Telegram
-                </a>{" "}
-                to pay via Binance, Payoneer, or your preferred method.
-              </p>
-            )}
-          </>
+          <div id="paypal-button-container" className="w-full mt-3"></div>
         )}
 
-        {/* 💬 Info Message */}
+        {/* Inline info message */}
         {infoMessage && (
           <p className="text-sm text-gray-800 mt-4 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 transition">
             {infoMessage}
           </p>
         )}
 
-        {/* 💬 Hover Message for Failures */}
-        {hoverMessage && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg">
-            💬 Payment failed or cancelled. Contact us on Telegram @htgstudio
-          </div>
+        {/* Restricted message */}
+        {restrictedCountries.includes(countryCode) && (
+          <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+            ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
+            <a href="https://t.me/htgstudio" target="_blank" rel="noopener noreferrer" className="text-blue-600 font-bold hover:underline">
+              Contact us on Telegram
+            </a>{" "}
+            to pay via Binance, Payoneer, or your preferred method.
+          </p>
         )}
+
+        {/* Constant floating help hover */}
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-pulse">
+          💬 Can’t make payment using the available methods?{" "}
+          <a href="https://t.me/htgstudio" target="_blank" className="underline font-semibold">
+            @htgstudio
+          </a>
+        </div>
       </div>
     </div>
   );
