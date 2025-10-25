@@ -8,7 +8,7 @@ export async function POST(request) {
     ).toString("base64");
 
     const tokenResponse = await fetch(
-      "https://api-m.sandbox.paypal.com/v1/oauth2/token",
+      "https://https://api-m.paypal.com/v2/checkout/orders",
       {
         method: "POST",
         headers: {
@@ -31,7 +31,7 @@ export async function POST(request) {
 
     // 💵 Create PayPal order
     const orderResponse = await fetch(
-      "https://api-m.sandbox.paypal.com/v2/checkout/orders",
+      "https://api-m.paypal.com/v2/checkout/orders",
       {
         method: "POST",
         headers: {
