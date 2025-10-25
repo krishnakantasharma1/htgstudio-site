@@ -343,38 +343,66 @@ useEffect(() => {
           </label>
         </div>
 
-        {/* Pay Buttons */}
-        {currency === "INR" ? (
-          <button
-            onClick={handleRazorpay}
-            disabled={processing}
-            className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
-              processing
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700"
-            }`}
-          >
-            {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
-          </button>
-        ) : (
-          <>
-            <div id="paypal-button-container" className="w-full mt-3"></div>
-            {restrictedCountries.includes(countryCode) && (
-              <p className="text-sm text-gray-800 mt-5 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
-                ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
-                <a
-                  href="https://t.me/htgstudio"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-600 font-bold hover:underline"
-                >
-                  Contact us on Telegram
-                </a>{" "}
-                to pay via Binance, Payoneer, or your preferred method.
-              </p>
-            )}
-          </>
-        )}
+        {/* ✅ Payment Buttons Section */}
+{currency === "INR" ? (
+  <>
+    {/* Razorpay Button */}
+    <button
+      onClick={() => {
+        if (!accepted) return; // Prevent payment if not accepted
+        handleRazorpay();
+      }}
+      disabled={processing}
+      className={`w-full py-3 rounded-lg text-white font-semibold transition shadow-sm hover:shadow-md ${
+        processing
+          ? "bg-gray-400 cursor-not-allowed"
+          : accepted
+          ? "bg-blue-600 hover:bg-blue-700"
+          : "bg-blue-400 cursor-not-allowed"
+      }`}
+    >
+      {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
+    </button>
+
+    {/* Message if terms not accepted */}
+    {!accepted && (
+      <p className="text-sm text-gray-800 mt-3 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+        ⚠️ Please accept the <b>Terms & Conditions</b> and <b>Refund Policy</b> before making a payment.
+      </p>
+    )}
+  </>
+) : (
+  <>
+    {/* PayPal Button */}
+    <div
+      id="paypal-button-container"
+      className={`w-full mt-3 ${!accepted ? "opacity-60 pointer-events-none" : ""}`}
+    ></div>
+
+    {/* Message if terms not accepted */}
+    {!accepted && (
+      <p className="text-sm text-gray-800 mt-3 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+        ⚠️ Please accept the <b>Terms & Conditions</b> and <b>Refund Policy</b> before making a payment.
+      </p>
+    )}
+
+    {/* Restricted country fallback message */}
+    {restrictedCountries.includes(countryCode) && (
+      <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+        ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
+        <a
+          href="https://t.me/htgstudio"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-blue-600 font-bold hover:underline"
+        >
+          Contact us on Telegram
+        </a>{" "}
+        to pay via Binance, Payoneer, or your preferred method.
+      </p>
+    )}
+  </>
+)}
 
         {showTelegramHint && (
           <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-bounce">
