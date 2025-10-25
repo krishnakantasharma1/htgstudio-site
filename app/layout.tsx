@@ -12,72 +12,88 @@ const inter = Inter({ subsets: ["latin"] });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<any>(null);
-    const [menuOpen, setMenuOpen] = useState(false);
-      const [hasAccess, setHasAccess] = useState(false);
-        const menuRef = useRef<HTMLDivElement | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [hasAccess, setHasAccess] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
-          // ✅ Watch Firebase auth
-            useEffect(() => {
-                const checkAccess = (currentUser: any) => {
-                      if (currentUser) {
-                              const key = `${currentUser.email}_access`;
-                                      const access = localStorage.getItem(key) === "true";
-                                              setHasAccess(access);
-                      } else {
-                              setHasAccess(false);
-                      }
-                };
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(() => {
+      setAuthChecked(true);
+    });
 
-                    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-                          setUser(currentUser);
-                                checkAccess(currentUser);
-                    });
+    const handlePopState = () => window.location.reload();
+    window.addEventListener("popstate", handlePopState);
 
-                        const handleAccessUpdate = () => {
-                              if (auth.currentUser) checkAccess(auth.currentUser);
-                        };
+    return () => {
+      unsub();
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
 
-                            window.addEventListener("access-updated", handleAccessUpdate);
-                                window.addEventListener("storage", handleAccessUpdate);
+  // ✅ Watch Firebase auth
+  useEffect(() => {
+    const checkAccess = (currentUser: any) => {
+      if (currentUser) {
+        const key = `${currentUser.email}_access`;
+        const access = localStorage.getItem(key) === "true";
+        setHasAccess(access);
+      } else {
+        setHasAccess(false);
+      }
+    };
 
-                                    return () => {
-                                          unsubscribe();
-                                                window.removeEventListener("access-updated", handleAccessUpdate);
-                                                      window.removeEventListener("storage", handleAccessUpdate);
-                                    };
-            }, []);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      checkAccess(currentUser);
+    });
 
-              // ✅ Close dropdown when clicking outside
-                useEffect(() => {
-                    const handler = (e: MouseEvent) => {
-                          if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-                                  setMenuOpen(false);
-                          }
-                    };
-                        document.addEventListener("mousedown", handler);
-                            return () => document.removeEventListener("mousedown", handler);
-                }, []);
+    const handleAccessUpdate = () => {
+      if (auth.currentUser) checkAccess(auth.currentUser);
+    };
 
-                  // ✅ Logout handler
-                    const handleLogout = async () => {
-                        try {
-                              await signOut(auth);
-                                    setUser(null);
-                                          setHasAccess(false);
-                                                setMenuOpen(false);
+    window.addEventListener("access-updated", handleAccessUpdate);
+    window.addEventListener("storage", handleAccessUpdate);
 
-                                                      Object.keys(localStorage).forEach((key) => {
-                                                              if (key.includes("_access")) localStorage.removeItem(key);
-                                                      });
+    return () => {
+      unsubscribe();
+      window.removeEventListener("access-updated", handleAccessUpdate);
+      window.removeEventListener("storage", handleAccessUpdate);
+    };
+  }, []);
 
-                                                            setTimeout(() => window.location.reload(), 300);
-                        } catch (err) {
-                              console.error("Logout error:", err);
-                                    alert("Logout failed. Please try again.");
-                        }
-                    };
-                    //reloader
-                                         useEffect(() => {
+  // ✅ Close dropdown when clicking outside
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setMenuOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  // ✅ Logout handler
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+      setHasAccess(false);
+      setMenuOpen(false);
+
+      Object.keys(localStorage).forEach((key) => {
+        if (key.includes("_access")) localStorage.removeItem(key);
+      });
+
+      setTimeout(() => window.location.reload(), 300);
+    } catch (err) {
+      console.error("Logout error:", err);
+      alert("Logout failed. Please try again.");
+    }
+  };
+
+  // ✅ Handle back button reload
+  useEffect(() => {
     const handlePopState = () => {
       window.location.reload();
     };
@@ -85,6 +101,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  // ✅ Wait for Firebase auth to finish checking
+  if (!authChecked) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-600">
+        <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+        Checking session...
+      </div>
+    );
+  }
+
+  // ✅ Render normally after auth is checked
+  return (
+    <html lang="en">
+      <body suppressHydrationWarning={true}>{children}</body>
+    </html>
+  );
+}
+
 
                       return (
                           <html lang="en" className="light">
