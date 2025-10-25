@@ -141,66 +141,76 @@ export default function CheckoutPage() {
     rzp.open();
   };
 
-  // ✅ PayPal Smart Buttons (Popup)
-  useEffect(() => {
-    if (currency === "INR" || !user) return; // Skip if India
+ // ✅ PayPal Smart Buttons (Popup)
+useEffect(() => {
+  if (currency === "INR" || !user) return; // Skip for India
+  const container = document.getElementById("paypal-button-container");
+  if (!container) return;
+
+  // Remove old buttons before re-rendering
+  container.innerHTML = "";
+
+  const loadPayPal = () => {
+    if (window.paypal) {
+      window.paypal.Buttons({
+        createOrder: async () => {
+          const res = await fetch("/api/create-paypal-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount: "1.99", currency: "USD" }),
+          });
+          const data = await res.json();
+          return data.id;
+        },
+        onApprove: async (data) => {
+          setProcessing(true);
+          const capture = await fetch("/api/capture-paypal-order", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
+          });
+          const result = await capture.json();
+
+          if (result.success) {
+            await setDoc(
+              doc(db, "purchases", user.uid),
+              {
+                hasAccess: true,
+                paymentId: result.id,
+                purchasedAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+
+            localStorage.setItem(`${user.email}_access`, "true");
+            alert("Payment successful! Redirecting to dashboard...");
+            router.push("/dashboard");
+            setTimeout(() => window.location.reload(), 1000);
+          } else {
+            alert("Payment capture failed. Please contact support.");
+          }
+          setProcessing(false);
+        },
+        onError: (err) => {
+          console.error(err);
+          alert("PayPal payment failed. Please try again.");
+          setProcessing(false);
+        },
+      }).render("#paypal-button-container");
+    }
+  };
+
+  // ✅ Load PayPal SDK if not already loaded
+  if (!window.paypal) {
     const script = document.createElement("script");
     script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&currency=USD`;
     script.async = true;
-    script.onload = () => {
-      if (window.paypal && document.getElementById("paypal-button-container")) {
-        window.paypal.Buttons({
-          createOrder: async () => {
-            const res = await fetch("/api/create-paypal-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ amount: "0.01", currency: "USD" }),
-            });
-            const data = await res.json();
-            return data.id;
-          },
-          onApprove: async (data) => {
-            setProcessing(true);
-            const capture = await fetch("/api/capture-paypal-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                orderId: data.orderID,
-                userId: user.uid,
-              }),
-            });
-            const result = await capture.json();
-
-            if (result.success) {
-              await setDoc(
-                doc(db, "purchases", user.uid),
-                {
-                  hasAccess: true,
-                  paymentId: result.id,
-                  purchasedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
-
-              localStorage.setItem(`${user.email}_access`, "true");
-              alert("Payment successful! Redirecting to dashboard...");
-              router.push("/dashboard");
-              setTimeout(() => window.location.reload(), 1000);
-            } else {
-              alert("Payment capture failed. Please contact support.");
-            }
-            setProcessing(false);
-          },
-          onError: (err) => {
-            console.error(err);
-            alert("PayPal payment failed. Please try again.");
-            setProcessing(false);
-          },
-        }).render("#paypal-button-container");
-      }
-    };
+    script.onload = loadPayPal;
     document.body.appendChild(script);
-  }, [currency, user, router]);
+  } else {
+    loadPayPal();
+  }
+}, [currency, user, router]);
 
   if (loading)
     return (
