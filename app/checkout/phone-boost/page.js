@@ -142,33 +142,31 @@ export default function CheckoutPage() {
   };
 
  // ✅ PayPal Smart Buttons (Popup)
-// ✅ PayPal Smart Buttons (Popup)
+// ✅ PayPal Smart Buttons (Popup with next/script safe load)
 useEffect(() => {
   if (currency === "INR" || !user) return; // Skip for India
 
   const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
   if (!PAYPAL_CLIENT_ID) {
-    console.error("Missing PayPal client ID in environment variables");
+    console.error("❌ Missing NEXT_PUBLIC_PAYPAL_CLIENT_ID in .env.local");
     return;
   }
 
+  // Make sure we have a clean container
   const container = document.getElementById("paypal-button-container");
-  if (!container) return;
+  if (container) container.innerHTML = "";
 
-  // Clear previous render
-  container.innerHTML = "";
+  const renderButtons = () => {
+    if (!window.paypal || !window.paypal.Buttons) {
+      console.warn("⚠️ PayPal SDK not ready yet");
+      return;
+    }
 
-  // Function to render buttons safely
-  const renderPayPalButtons = () => {
-    if (window.paypal && window.paypal.Buttons) {
-      try {
-        window.paypal.Buttons({
-          style: {
-            layout: "vertical",
-            color: "blue",
-            shape: "rect",
-            label: "paypal",
-          },
+    try {
+      window.paypal
+        .Buttons({
+          style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
+
           createOrder: async () => {
             const res = await fetch("/api/create-paypal-order", {
               method: "POST",
@@ -178,6 +176,7 @@ useEffect(() => {
             const data = await res.json();
             return data.id;
           },
+
           onApprove: async (data) => {
             setProcessing(true);
             const capture = await fetch("/api/capture-paypal-order", {
@@ -199,36 +198,43 @@ useEffect(() => {
               );
 
               localStorage.setItem(`${user.email}_access`, "true");
-              alert("Payment successful! Redirecting to dashboard...");
+              alert("✅ Payment successful! Redirecting...");
               router.push("/dashboard");
               setTimeout(() => window.location.reload(), 1000);
             } else {
-              alert("Payment capture failed. Please contact support.");
+              alert("⚠️ Payment capture failed. Please contact support.");
             }
+
             setProcessing(false);
           },
+
           onError: (err) => {
             console.error("PayPal error:", err);
             alert("PayPal payment failed. Please try again.");
             setProcessing(false);
           },
-        }).render("#paypal-button-container");
-      } catch (err) {
-        console.error("PayPal button render failed:", err);
-      }
+        })
+        .render("#paypal-button-container");
+    } catch (err) {
+      console.error("💥 Failed to render PayPal buttons:", err);
     }
   };
 
-  // ✅ Load PayPal SDK dynamically if not loaded
-  if (!window.paypal) {
-    const script = document.createElement("script");
-    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`;
-    script.async = true;
-    script.onload = renderPayPalButtons;
-    script.onerror = () => console.error("Failed to load PayPal SDK");
-    document.body.appendChild(script);
+  // ✅ Check if SDK is already loaded
+  if (window.paypal) {
+    renderButtons();
   } else {
-    renderPayPalButtons();
+    // ✅ Load PayPal SDK via next/script
+    const existing = document.querySelector('script[src*="www.paypal.com/sdk/js"]');
+    if (!existing) {
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD&intent=capture`;
+      script.async = true;
+      script.onload = renderButtons;
+      document.body.appendChild(script);
+    } else {
+      existing.addEventListener("load", renderButtons);
+    }
   }
 }, [currency, user, router]);
 
