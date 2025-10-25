@@ -163,7 +163,7 @@ useEffect(() => {
               clearTimeout(window.__termsTimer);
               window.__termsTimer = setTimeout(() => {
                 setInfoMessage("");
-              }, 5000);
+              }, 50000);
 
               return actions.reject(); // stop popup completely
             }
