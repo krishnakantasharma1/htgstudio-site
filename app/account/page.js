@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { auth, db } from "@/lib/firebase";
 import {
   onAuthStateChanged,
@@ -15,7 +15,7 @@ import {
 } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
 
-// ✅ One-time refresh to fix stale auth
+// ✅ One-time refresh to fix stale auth (safe)
 if (typeof window !== "undefined") {
   const hasRefreshed = sessionStorage.getItem("accountRefreshed");
   if (!hasRefreshed) {
@@ -24,9 +24,11 @@ if (typeof window !== "undefined") {
   }
 }
 
-// ✅ Persistent login
+// ✅ Keep Firebase session persistent
 if (auth && typeof window !== "undefined") {
-  setPersistence(auth, browserLocalPersistence).catch(console.warn);
+  setPersistence(auth, browserLocalPersistence).catch((err) =>
+    console.warn("Persistence setup failed:", err)
+  );
 }
 
 export default function AccountPage() {
@@ -38,22 +40,31 @@ export default function AccountPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const searchParams = useSearchParams();
 
-  const from = searchParams.get("from"); // ✅ reliable "from" page
+  // ✅ Detect previous page
+  const [previousUrl, setPreviousUrl] = useState(null);
+  useEffect(() => {
+    if (typeof document !== "undefined" && document.referrer) {
+      const referrer = document.referrer;
+      if (referrer.includes(window.location.origin)) {
+        setPreviousUrl(referrer);
+      }
+    }
+  }, []);
 
-  // ✅ Common redirect helper
-  const handleRedirectAfterAuth = () => {
-    if (from === "/course") {
+  // ✅ Redirect helper
+  const handleRedirectAfterLogin = (prev) => {
+    const fromCoursePage = prev?.includes("/course");
+    if (fromCoursePage) {
       router.push("/checkout/phone-boost");
-    } else if (from && from.startsWith("/")) {
-      router.push(from);
+    } else if (prev) {
+      window.location.href = prev;
     } else {
       router.back();
     }
   };
 
-  // ✅ Observe auth state
+  // ✅ Observe auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       setUser(u);
@@ -65,24 +76,25 @@ export default function AccountPage() {
             localStorage.setItem(`${u.email}_access`, "true");
             window.dispatchEvent(new Event("access-updated"));
           }
-          handleRedirectAfterAuth();
+
+          handleRedirectAfterLogin(previousUrl);
         } catch (err) {
           console.warn("Access sync failed:", err);
         }
       }
     });
     return () => unsub();
-  }, []);
+  }, [previousUrl, router]);
 
-  // ✅ Login
+  // ✅ Login handler
   const handleLogin = async (e) => {
     e.preventDefault();
-    setError("");
     setLoading(true);
+    setError("");
 
     try {
-      const userCred = await signInWithEmailAndPassword(auth, email, password);
-      const loggedUser = userCred.user;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const loggedUser = userCredential.user;
 
       const ref = doc(db, "purchases", loggedUser.uid);
       const snap = await getDoc(ref);
@@ -92,7 +104,7 @@ export default function AccountPage() {
       );
       window.dispatchEvent(new Event("access-updated"));
 
-      handleRedirectAfterAuth();
+      handleRedirectAfterLogin(previousUrl);
     } catch (err) {
       console.error("Login error:", err);
       setError("Invalid email or password.");
@@ -101,7 +113,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ Register
+  // ✅ Register handler
   const handleRegister = async (e) => {
     e.preventDefault();
     setError("");
@@ -114,18 +126,19 @@ export default function AccountPage() {
     }
 
     try {
-      const userCred = await createUserWithEmailAndPassword(auth, email, password);
-      const newUser = userCred.user;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const newUser = userCredential.user;
       localStorage.setItem(`${newUser.email}_access`, "false");
       window.dispatchEvent(new Event("access-updated"));
-      handleRedirectAfterAuth();
+
+      handleRedirectAfterLogin(previousUrl);
     } catch (err) {
       console.error("Registration failed:", err);
-      setError(
-        err.code === "auth/email-already-in-use"
-          ? "Email already registered."
-          : "Failed to register. Try again."
-      );
+      if (err.code === "auth/email-already-in-use") {
+        setError("Email already registered.");
+      } else {
+        setError("Failed to register. Try again.");
+      }
     } finally {
       setLoading(false);
     }
@@ -145,7 +158,8 @@ export default function AccountPage() {
       const snap = await getDoc(ref);
       localStorage.setItem(`${u.email}_access`, snap.exists() ? "true" : "false");
       window.dispatchEvent(new Event("access-updated"));
-      handleRedirectAfterAuth();
+
+      handleRedirectAfterLogin(previousUrl);
     } catch (err) {
       console.error("Google Sign-In failed:", err);
       setError("Google Sign-In failed. Try again.");
@@ -169,7 +183,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ UI same as before
+  // ✅ UI (no changes)
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-gray-50 px-4">
       <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-md text-center border border-gray-100">
