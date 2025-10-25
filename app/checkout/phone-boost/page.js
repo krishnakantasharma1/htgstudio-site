@@ -138,7 +138,7 @@ export default function CheckoutPage() {
   };
 
   // ✅ PayPal Integration
-// ✅ PayPal Integration (with stable Terms message + delay)
+// ✅ PayPal Integration (bulletproof terms enforcement)
 useEffect(() => {
   if (currency === "INR" || !user) return;
   const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
@@ -152,20 +152,22 @@ useEffect(() => {
         .Buttons({
           style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
 
-          // 🛑 Stop PayPal popup if Terms unchecked
+          // 🛑 Stop PayPal popup if Terms not accepted
           onClick: (data, actions) => {
             if (!accepted) {
-              // Show animated message under buttons
+              // Persist message state safely outside PayPal DOM
               setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
+              setShowHover(false);
 
-              // Keep message visible for 4 seconds, fade out smoothly
-              const fadeTimer = setTimeout(() => {
+              // Keep message visible for 5s minimum, not instant removal
+              clearTimeout(window.__termsTimer);
+              window.__termsTimer = setTimeout(() => {
                 setInfoMessage("");
-              }, 4000);
+              }, 5000);
 
-              return actions.reject(); // Stop popup opening
+              return actions.reject(); // stop popup completely
             }
-            return actions.resolve(); // Continue normally
+            return actions.resolve(); // allow popup
           },
 
           createOrder: async () => {
@@ -181,12 +183,14 @@ useEffect(() => {
           onApprove: async (data) => {
             setProcessing(true);
             setShowHover(false);
+
             const capture = await fetch("/api/capture-paypal-order", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
             });
             const result = await capture.json();
+
             if (result.success) {
               await setDoc(
                 doc(db, "purchases", user.uid),
@@ -204,20 +208,24 @@ useEffect(() => {
             } else {
               setShowHover(true);
             }
+
             setProcessing(false);
           },
 
           onError: () => {
             setShowHover(true);
             setInfoMessage("⚠️ Payment failed. Please try again or contact @htgstudio.");
-            setTimeout(() => setInfoMessage(""), 6000);
+            clearTimeout(window.__termsTimer);
+            window.__termsTimer = setTimeout(() => {
+              setInfoMessage("");
+            }, 6000);
           },
         })
         .render("#paypal-button-container");
     }
   };
 
-  // Load SDK dynamically if not already loaded
+  // ✅ Load PayPal SDK dynamically
   if (!window.paypal) {
     const script = document.createElement("script");
     script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
