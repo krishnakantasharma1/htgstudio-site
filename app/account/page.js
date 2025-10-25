@@ -52,6 +52,13 @@ export default function AccountPage() {
     }
   }, []);
 
+  // ✅ Helper: get ?next parameter
+  const getNextUrl = () => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("next");
+  };
+
   // ✅ Observe auth
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
@@ -66,8 +73,12 @@ export default function AccountPage() {
           }
 
           // ✅ Redirect logic after successful auth
+          const next = getNextUrl();
           const fromCourses = previousUrl?.includes("/courses/phone-boost");
-          if (fromCourses) {
+
+          if (next && next.startsWith("/")) {
+            router.push(next);
+          } else if (fromCourses) {
             router.push("/checkout/phone-boost");
           } else if (previousUrl) {
             window.location.href = previousUrl;
@@ -100,9 +111,12 @@ export default function AccountPage() {
       );
       window.dispatchEvent(new Event("access-updated"));
 
-      // ✅ Same redirect logic for login
+      const next = getNextUrl();
       const fromCourses = previousUrl?.includes("/courses/phone-boost");
-      if (fromCourses) {
+
+      if (next && next.startsWith("/")) {
+        router.push(next);
+      } else if (fromCourses) {
         router.push("/checkout/phone-boost");
       } else if (previousUrl) {
         window.location.href = previousUrl;
@@ -135,8 +149,12 @@ export default function AccountPage() {
       localStorage.setItem(`${newUser.email}_access`, "false");
       window.dispatchEvent(new Event("access-updated"));
 
+      const next = getNextUrl();
       const fromCourses = previousUrl?.includes("/courses/phone-boost");
-      if (fromCourses) {
+
+      if (next && next.startsWith("/")) {
+        router.push(next);
+      } else if (fromCourses) {
         router.push("/checkout/phone-boost");
       } else if (previousUrl) {
         window.location.href = previousUrl;
@@ -170,8 +188,12 @@ export default function AccountPage() {
       localStorage.setItem(`${u.email}_access`, snap.exists() ? "true" : "false");
       window.dispatchEvent(new Event("access-updated"));
 
+      const next = getNextUrl();
       const fromCourses = previousUrl?.includes("/courses/phone-boost");
-      if (fromCourses) {
+
+      if (next && next.startsWith("/")) {
+        router.push(next);
+      } else if (fromCourses) {
         router.push("/checkout/phone-boost");
       } else if (previousUrl) {
         window.location.href = previousUrl;
