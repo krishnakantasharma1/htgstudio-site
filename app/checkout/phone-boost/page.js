@@ -227,7 +227,11 @@ export default function CheckoutPage() {
           <label htmlFor="terms" className="ml-2 text-sm text-gray-600 select-none">
             I accept the{" "}
             <a href="/terms" target="_blank" className="text-blue-600 hover:underline">Terms & Conditions</a> and{" "}
-            <a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">Refund Policy</a>.
+            
+            <span className="text-blue-600 hover:underline cursor-default">Refund</span>{' '}
+<a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">
+  Policy
+</a>.
           </label>
         </div>
 
