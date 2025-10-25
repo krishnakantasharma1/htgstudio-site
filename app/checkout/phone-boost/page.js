@@ -16,10 +16,11 @@ export default function CheckoutPage() {
   const [hasAccess, setHasAccess] = useState(false);
   const [processing, setProcessing] = useState(false);
   const [accepted, setAccepted] = useState(false);
-  const [infoMessage, setInfoMessage] = useState(""); // inline message
+  const [infoMessage, setInfoMessage] = useState("");
+  const [showHover, setShowHover] = useState(false); // 💬 Hover on failure
   const router = useRouter();
 
-  // ✅ Detect country via IP
+  // ✅ Detect country
   useEffect(() => {
     fetch("https://ipapi.co/json/")
       .then((res) => res.json())
@@ -34,7 +35,7 @@ export default function CheckoutPage() {
 
   const restrictedCountries = ["PK", "BD", "NG", "AF", "CU", "IR", "SD", "SY"];
 
-  // ✅ Watch Firebase Auth
+  // ✅ Watch Auth
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       if (!u) {
@@ -66,6 +67,7 @@ export default function CheckoutPage() {
     if (!user) return alert("Please log in first.");
 
     setProcessing(true);
+    setShowHover(false);
 
     const res = await fetch("/api/create-order", {
       method: "POST",
@@ -76,6 +78,7 @@ export default function CheckoutPage() {
     const data = await res.json();
     if (!data.success) {
       setProcessing(false);
+      setShowHover(true);
       return;
     }
 
@@ -101,7 +104,11 @@ export default function CheckoutPage() {
             }),
           });
           const verifyData = await verifyRes.json();
-          if (!verifyData.success) return;
+          if (!verifyData.success) {
+            setShowHover(true);
+            setProcessing(false);
+            return;
+          }
           await setDoc(
             doc(db, "purchases", user.uid),
             {
@@ -116,13 +123,13 @@ export default function CheckoutPage() {
           router.push("/dashboard");
           setTimeout(() => window.location.reload(), 1000);
         } catch {
-          console.error("Payment verification failed.");
+          setShowHover(true);
         } finally {
           setProcessing(false);
         }
       },
       modal: {
-        ondismiss: () => setInfoMessage("⚠️ Payment cancelled. Please try again or contact us."),
+        ondismiss: () => setShowHover(true),
       },
       prefill: { email: user.email },
       theme: { color: "#2563eb" },
@@ -130,10 +137,9 @@ export default function CheckoutPage() {
     rzp.open();
   };
 
-  // ✅ PayPal Button (always visible)
+  // ✅ PayPal Integration
   useEffect(() => {
     if (currency === "INR" || !user) return;
-
     const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
     const container = document.getElementById("paypal-button-container");
     if (!container) return;
@@ -160,6 +166,7 @@ export default function CheckoutPage() {
                 return;
               }
               setProcessing(true);
+              setShowHover(false);
               const capture = await fetch("/api/capture-paypal-order", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -181,12 +188,14 @@ export default function CheckoutPage() {
                 router.push("/dashboard");
                 setTimeout(() => window.location.reload(), 1000);
               } else {
-                setInfoMessage("⚠️ Payment failed. Please contact us on Telegram @htgstudio.");
+                setShowHover(true);
               }
               setProcessing(false);
             },
-            onError: () =>
-              setInfoMessage("⚠️ Something went wrong. Contact us on Telegram @htgstudio."),
+            onError: () => {
+              setShowHover(true);
+              setInfoMessage("⚠️ Payment failed. Please try again or contact @htgstudio.");
+            },
           })
           .render("#paypal-button-container");
       }
@@ -267,14 +276,12 @@ export default function CheckoutPage() {
           <div id="paypal-button-container" className="w-full mt-3"></div>
         )}
 
-        {/* Inline info message */}
         {infoMessage && (
           <p className="text-sm text-gray-800 mt-4 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 transition">
             {infoMessage}
           </p>
         )}
 
-        {/* Restricted message */}
         {restrictedCountries.includes(countryCode) && (
           <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
             ⚠️ Can’t make payment using Razorpay or PayPal?{" "}
@@ -285,13 +292,15 @@ export default function CheckoutPage() {
           </p>
         )}
 
-        {/* Constant floating help hover */}
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-pulse">
-          💬 Can’t make payment using the available methods?{" "}
-          <a href="https://t.me/htgstudio" target="_blank" className="underline font-semibold">
-            @htgstudio
-          </a>
-        </div>
+        {/* 💬 Hover for failed payments only */}
+        {showHover && (
+          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-pulse">
+            💬 Can’t make payment using the available methods?{" "}
+            <a href="https://t.me/htgstudio" target="_blank" className="underline font-semibold">
+              @htgstudio
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
