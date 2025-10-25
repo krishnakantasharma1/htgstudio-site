@@ -52,9 +52,9 @@ export default function AccountPage() {
     }
   }, []);
 
-  // ✅ Redirect helper
+  // ✅ Redirect helper (fixed condition)
   const handleRedirectAfterLogin = (prev) => {
-    const fromCoursePage = prev?.includes("/course");
+    const fromCoursePage = prev?.includes("/course") && !prev?.includes("/courses");
     if (fromCoursePage) {
       router.push("/checkout/phone-boost");
     } else if (prev) {
@@ -183,7 +183,7 @@ export default function AccountPage() {
     }
   };
 
-  // ✅ UI (no changes)
+  // ✅ UI (unchanged)
   return (
     <div className="flex items-center justify-center min-h-[80vh] bg-gray-50 px-4">
       <div className="bg-white w-full max-w-md p-8 rounded-2xl shadow-md text-center border border-gray-100">
