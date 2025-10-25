@@ -138,78 +138,87 @@ export default function CheckoutPage() {
   };
 
   // ✅ PayPal Integration
-  useEffect(() => {
-    if (currency === "INR" || !user) return;
-    const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-    const container = document.getElementById("paypal-button-container");
-    if (!container) return;
-    container.innerHTML = "";
+  // ✅ PayPal Integration (with Terms Pre-check)
+useEffect(() => {
+  if (currency === "INR" || !user) return;
+  const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+  const container = document.getElementById("paypal-button-container");
+  if (!container) return;
+  container.innerHTML = "";
 
-    const renderButtons = () => {
-      if (window.paypal && window.paypal.Buttons) {
-        window.paypal
-          .Buttons({
-            style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
-            createOrder: async () => {
-              const res = await fetch("/api/create-paypal-order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount: "1.99", currency: "USD" }),
-              });
-              const data = await res.json();
-              return data.id;
-            },
-            onApprove: async (data) => {
-              if (!accepted) {
-                setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
-                setTimeout(() => setInfoMessage(""), 4000);
-                return;
-              }
-              setProcessing(true);
-              setShowHover(false);
-              const capture = await fetch("/api/capture-paypal-order", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
-              });
-              const result = await capture.json();
-              if (result.success) {
-                await setDoc(
-                  doc(db, "purchases", user.uid),
-                  {
-                    hasAccess: true,
-                    paymentId: result.id,
-                    purchasedAt: new Date().toISOString(),
-                  },
-                  { merge: true }
-                );
-                localStorage.setItem(`${user.email}_access`, "true");
-                alert("✅ Payment successful! Redirecting...");
-                router.push("/dashboard");
-                setTimeout(() => window.location.reload(), 1000);
-              } else {
-                setShowHover(true);
-              }
-              setProcessing(false);
-            },
-            onError: () => {
+  const renderButtons = () => {
+    if (window.paypal && window.paypal.Buttons) {
+      window.paypal
+        .Buttons({
+          style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
+
+          // 🛑 Prevent PayPal popup if terms not accepted
+          onClick: (data, actions) => {
+            if (!accepted) {
+              setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
+              setTimeout(() => setInfoMessage(""), 4000);
+              return actions.reject(); // ❌ stop PayPal popup
+            }
+            return actions.resolve(); // ✅ continue normally
+          },
+
+          createOrder: async () => {
+            const res = await fetch("/api/create-paypal-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ amount: "1.99", currency: "USD" }),
+            });
+            const data = await res.json();
+            return data.id;
+          },
+
+          onApprove: async (data) => {
+            setProcessing(true);
+            setShowHover(false);
+            const capture = await fetch("/api/capture-paypal-order", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
+            });
+            const result = await capture.json();
+            if (result.success) {
+              await setDoc(
+                doc(db, "purchases", user.uid),
+                {
+                  hasAccess: true,
+                  paymentId: result.id,
+                  purchasedAt: new Date().toISOString(),
+                },
+                { merge: true }
+              );
+              localStorage.setItem(`${user.email}_access`, "true");
+              alert("✅ Payment successful! Redirecting...");
+              router.push("/dashboard");
+              setTimeout(() => window.location.reload(), 1000);
+            } else {
               setShowHover(true);
-              setInfoMessage("⚠️ Payment failed. Please try again or contact @htgstudio.");
-            },
-          })
-          .render("#paypal-button-container");
-      }
-    };
+            }
+            setProcessing(false);
+          },
 
-    if (!window.paypal) {
-      const script = document.createElement("script");
-      script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
-      script.onload = renderButtons;
-      document.body.appendChild(script);
-    } else {
-      renderButtons();
+          onError: () => {
+            setShowHover(true);
+            setInfoMessage("⚠️ Payment failed. Please try again or contact @htgstudio.");
+          },
+        })
+        .render("#paypal-button-container");
     }
-  }, [currency, user, accepted, router]);
+  };
+
+  if (!window.paypal) {
+    const script = document.createElement("script");
+    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+    script.onload = renderButtons;
+    document.body.appendChild(script);
+  } else {
+    renderButtons();
+  }
+}, [currency, user, accepted, router]);
 
   // ✅ Auto-hide hover after 10s
   useEffect(() => {
