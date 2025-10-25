@@ -174,7 +174,7 @@ useEffect(() => {
             const res = await fetch("/api/create-paypal-order", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ amount: "1.99", currency: "USD" }),
+              body: JSON.stringify({ amount: "0.01", currency: "USD" }),
             });
             const data = await res.json();
             return data.id;
