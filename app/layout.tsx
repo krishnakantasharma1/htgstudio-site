@@ -11,104 +11,108 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 const inter = Inter({ subsets: ["latin"] });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<any>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [hasAccess, setHasAccess] = useState(false);
-  const menuRef = useRef<HTMLDivElement | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
+      const [user, setUser] = useState<any>(null);
+      const [menuOpen, setMenuOpen] = useState(false);
+      const [hasAccess, setHasAccess] = useState(false);
+      const menuRef = useRef<HTMLDivElement | null>(null);
+      const [authChecked, setAuthChecked] = useState(false);
 
-  // ✅ Initial Auth Check + Reload on Back Navigation
-  useEffect(() => {
-    const unsub = auth.onAuthStateChanged(() => {
-      setAuthChecked(true);
-    });
+      useEffect(() => {
+            const unsub = auth.onAuthStateChanged(() => {
+                  setAuthChecked(true);
+            });
 
-    const handlePopState = () => window.location.reload();
-    window.addEventListener("popstate", handlePopState);
+            const handlePopState = () => window.location.reload();
+            window.addEventListener("popstate", handlePopState);
 
-    return () => {
-      unsub();
-      window.removeEventListener("popstate", handlePopState);
-    };
-  }, []);
+            return () => {
+                  unsub();
+                  window.removeEventListener("popstate", handlePopState);
+            };
+      }, []);
 
-  // ✅ Watch Firebase Auth for User + Access
-  useEffect(() => {
-    const checkAccess = (currentUser: any) => {
-      if (currentUser) {
-        const key = `${currentUser.email}_access`;
-        const access = localStorage.getItem(key) === "true";
-        setHasAccess(access);
-      } else {
-        setHasAccess(false);
+      // ✅ Watch Firebase auth
+      useEffect(() => {
+            const checkAccess = (currentUser: any) => {
+                  if (currentUser) {
+                        const key = `${currentUser.email}_access`;
+                        const access = localStorage.getItem(key) === "true";
+                        setHasAccess(access);
+                  } else {
+                        setHasAccess(false);
+                  }
+            };
+
+            const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+                  setUser(currentUser);
+                  checkAccess(currentUser);
+            });
+
+            const handleAccessUpdate = () => {
+                  if (auth.currentUser) checkAccess(auth.currentUser);
+            };
+
+            window.addEventListener("access-updated", handleAccessUpdate);
+            window.addEventListener("storage", handleAccessUpdate);
+
+            return () => {
+                  unsubscribe();
+                  window.removeEventListener("access-updated", handleAccessUpdate);
+                  window.removeEventListener("storage", handleAccessUpdate);
+            };
+      }, []);
+
+      // ✅ Close dropdown when clicking outside
+      useEffect(() => {
+            const handler = (e: MouseEvent) => {
+                  if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+                        setMenuOpen(false);
+                  }
+            };
+            document.addEventListener("mousedown", handler);
+            return () => document.removeEventListener("mousedown", handler);
+      }, []);
+
+      // ✅ Logout handler
+      const handleLogout = async () => {
+            try {
+                  await signOut(auth);
+                  setUser(null);
+                  setHasAccess(false);
+                  setMenuOpen(false);
+
+                  Object.keys(localStorage).forEach((key) => {
+                        if (key.includes("_access")) localStorage.removeItem(key);
+                  });
+
+                  setTimeout(() => window.location.reload(), 300);
+            } catch (err) {
+                  console.error("Logout error:", err);
+                  alert("Logout failed. Please try again.");
+            }
+      };
+
+      // ✅ Handle back button reload
+      useEffect(() => {
+            const handlePopState = () => {
+                  window.location.reload();
+            };
+
+            window.addEventListener("popstate", handlePopState);
+            return () => window.removeEventListener("popstate", handlePopState);
+      }, []);
+
+      // ✅ Wait for Firebase auth to finish checking
+      if (!authChecked) {
+            return (
+                  <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-600">
+                        <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
+                        Checking session...
+                  </div>
+            );
       }
-    };
 
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      checkAccess(currentUser);
-    });
-
-    const handleAccessUpdate = () => {
-      if (auth.currentUser) checkAccess(auth.currentUser);
-    };
-
-    window.addEventListener("access-updated", handleAccessUpdate);
-    window.addEventListener("storage", handleAccessUpdate);
-
-    return () => {
-      unsubscribe();
-      window.removeEventListener("access-updated", handleAccessUpdate);
-      window.removeEventListener("storage", handleAccessUpdate);
-    };
-  }, []);
-
-  // ✅ Close dropdown when clicking outside
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, []);
-
-  // ✅ Logout handler
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      setUser(null);
-      setHasAccess(false);
-      setMenuOpen(false);
-
-      Object.keys(localStorage).forEach((key) => {
-        if (key.includes("_access")) localStorage.removeItem(key);
-      });
-
-      setTimeout(() => window.location.reload(), 300);
-    } catch (err) {
-      console.error("Logout error:", err);
-      alert("Logout failed. Please try again.");
-    }
-  };
-
-  // ✅ Loader while checking session
-  if (!authChecked) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 text-gray-600">
-        <div className="animate-spin h-10 w-10 border-4 border-blue-500 border-t-transparent rounded-full mb-4"></div>
-        Checking session...
-      </div>
-    );
-  }
-
-  // ✅ Normal render (you can keep your Navbar, children, etc.)
-  return (
-    <html lang="en">
-      <body suppressHydrationWarning={true}>{children}</body>
-    </html>
-  );
+      
 
 
 return (
