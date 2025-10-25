@@ -242,18 +242,26 @@ export default function CheckoutPage() {
         </button>
 
         {/* 👇 Telegram contact message */}
-        <p className="text-sm text-gray-800 mt-5 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+        <p className="text-sm text-gray-800 mt-5 font-semibold bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 flex items-center justify-center gap-2">
   Can’t complete your payment using the available methods?{" "}
   <a
     href="https://t.me/htgstudio"
     target="_blank"
     rel="noopener noreferrer"
-    className="text-blue-600 font-bold hover:underline"
+    className="flex items-center gap-1 text-blue-600 font-bold hover:underline"
   >
+    <Image
+      src="/tg1.png"
+      alt="Telegram"
+      width={18}
+      height={18}
+      className="inline-block"
+    />
     Contact us on Telegram
   </a>
   .
 </p>
+
 
 
         {/* 👇 Popup exit hint */}
