@@ -1,0 +1,96 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { motion } from "framer-motion";
+
+export default function PromoVideo() {
+  const iframeRef = useRef(null);
+  const playerRef = useRef(null);
+  const [isReady, setIsReady] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const VIDEO_ID = "Ua0VVb0iyOs"; // your YouTube video ID
+
+  useEffect(() => {
+    // ✅ Load the YouTube Iframe API once
+    const loadYTAPI = () =>
+      new Promise((resolve) => {
+        if (window.YT && window.YT.Player) return resolve();
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        window.onYouTubeIframeAPIReady = () => resolve();
+        document.body.appendChild(tag);
+      });
+
+    loadYTAPI().then(() => {
+      playerRef.current = new window.YT.Player(iframeRef.current, {
+        videoId: VIDEO_ID,
+        playerVars: {
+          autoplay: 0, // start paused
+          mute: 0,     // sound ON when started
+          controls: 0, // hide controls
+          rel: 0,
+          modestbranding: 1,
+          fs: 0,
+          playsinline: 1,
+          loop: 0,
+          showinfo: 0,
+        },
+        events: {
+          onReady: () => setIsReady(true),
+          onStateChange: (e) => {
+            if (e.data === window.YT.PlayerState.PLAYING) setIsPlaying(true);
+          },
+        },
+      });
+    });
+
+    return () => {
+      if (playerRef.current?.destroy) playerRef.current.destroy();
+    };
+  }, []);
+
+  const handlePlay = () => {
+    if (playerRef.current && isReady) {
+      playerRef.current.playVideo();
+      setIsPlaying(true);
+    }
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+      transition={{ delay: 0.3 }}
+      className="relative w-full max-w-3xl aspect-video rounded-2xl overflow-hidden shadow-lg mb-8"
+    >
+      {/* YouTube iframe placeholder */}
+      <div ref={iframeRef} className="absolute inset-0 w-full h-full" />
+
+      {/* Overlay dark mask for aesthetics */}
+      {!isPlaying && (
+        <div className="absolute inset-0 bg-black/50 flex items-center justify-center z-10">
+          <button
+            onClick={handlePlay}
+            disabled={!isReady}
+            className="flex flex-col items-center justify-center text-white hover:scale-105 transition-transform"
+          >
+            {/* ▶ Play Icon */}
+            <div className="bg-white/20 backdrop-blur-md p-6 rounded-full border border-white/40 shadow-xl">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="white"
+                viewBox="0 0 24 24"
+                className="w-12 h-12"
+              >
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+            <p className="mt-3 text-lg font-semibold tracking-wide">
+              Tap to Play with Sound
+            </p>
+          </button>
+        </div>
+      )}
+    </motion.div>
+  );
+}
