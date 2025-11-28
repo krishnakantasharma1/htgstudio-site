@@ -1,0 +1,14 @@
+export default function Head() {
+  return (
+      <>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+                  <meta name="color-scheme" content="light only" />
+                        <title>HTG Studio</title>
+                              <meta
+                                      name="description"
+                                              content="Learn and boost your phone performance with HTG Studio courses."
+                                                    />
+                                                          <link rel="icon" href="/logo.png" type="image/png" />
+                                                              </>
+  );
+}
