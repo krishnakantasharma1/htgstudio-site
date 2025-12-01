@@ -161,6 +161,12 @@ return (
                                     >
                                           Contact Us
                                     </Link>
+                                    <Link
+                                          href="/downloads"
+                                          className="hidden sm:inline hover:text-blue-600 transition"
+                                    >
+                                          Downloads
+                                    </Link>
 
                                     {hasAccess && (
                                           <>
@@ -215,6 +221,15 @@ return (
                                                                         >
                                                                               About Us
                                                                         </Link>
+                                                                        <Link
+                                                                              href="/downloads"
+                                                                              onClick={() => setMenuOpen(false)}
+                                                                              className="block px-4 py-2 hover:bg-gray-50 text-gray-800"
+                                                                        >
+                                                                              Downloads
+                                                                        </Link>
+                                                                        
+                                                                        
 
                                                                         {hasAccess && (
                                                                               <>
