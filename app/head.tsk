@@ -1,14 +1,29 @@
+// app/head.tsx
+export const metadata = {
+  title: "HTG Studio",
+  description: "Learn and boost your phone performance with HTG Studio courses.",
+  icons: {
+    icon: "/favicon.ico",
+    apple: "/apple-touch-icon.png",
+    shortcut: "/favicon.ico",
+  },
+};
+
 export default function Head() {
   return (
-      <>
-            <meta name="viewport" content="width=device-width, initial-scale=1" />
-                  <meta name="color-scheme" content="light only" />
-                        <title>HTG Studio</title>
-                              <meta
-                                      name="description"
-                                              content="Learn and boost your phone performance with HTG Studio courses."
-                                                    />
-                                                          <link rel="icon" href="/logo.png" type="image/png" />
-                                                              </>
+    <>
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="color-scheme" content="light only" />
+      <meta name="theme-color" content="#2563eb" />
+
+      {/* Preferred favicon formats (keep all for wider browser support) */}
+      <link rel="icon" href="/favicon.ico" />
+      <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+      <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+      <link rel="icon" type="image/png" sizes="96x96" href="/favicon-96x96.png" />
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+      <link rel="manifest" href="/site.webmanifest" />
+    </>
   );
 }
