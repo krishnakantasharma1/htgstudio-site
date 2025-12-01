@@ -1,0 +1,1 @@
+xport default function Head() {  return (    <>      <title>HTG Studio</title>      {/* Force browser refresh with version */}      <link rel="icon" href="/favicon.ico?v=7" />      <meta name="viewport" content="width=device-width, initial-scale=1" />      <meta        name="description"        content="Boost your phone performance with HTG Studio."      />    </>  );}
