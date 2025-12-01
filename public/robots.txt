@@ -1,0 +1,13 @@
+# robots.txt for HTG Studio
+User-agent: *
+Allow: /
+
+# Sitemap (primary)
+Sitemap: https://htgstudio.site/sitemap.xml
+
+# Crawl-delay (optional)
+# Crawl-delay: 10
+
+# Disallow any staging/test or admin paths if you have them
+# Disallow: /admin
+# Disallow: /api/internal
