@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { auth, db } from "@/lib/firebase";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -20,42 +19,24 @@ export default function CheckoutPage() {
   const [showHover, setShowHover] = useState(false);
   const router = useRouter();
 
+  // --- COUPON STATE (new)
+  const [couponCode, setCouponCode] = useState("");
+  const [couponError, setCouponError] = useState("");
+  const [couponApplied, setCouponApplied] = useState(false);
+  const [discountPercent, setDiscountPercent] = useState(0);
+
   // ✅ Detect user country
-    // ✅ Detect user country
   useEffect(() => {
     fetch("https://ipapi.co/json/")
       .then((res) => res.json())
       .then((data) => {
-        const detectedCountry = data.country_name || "Unknown";
-        const detectedCode = data.country_code || "";
-
-        setCountry(detectedCountry);
-        setCountryCode(detectedCode);
-
-        // ✅ Always use USD if:
-        // - user is outside India
-        // - OR detection failed ("Unknown")
-        // - OR using VPN (country code missing)
-        // - OR accessing from restricted country (like PK)
-        if (
-          detectedCode !== "IN" ||
-          detectedCountry === "Unknown" ||
-          !detectedCode ||
-          ["PK", "BD", "NG", "AF", "CU", "IR", "SD", "SY"].includes(detectedCode)
-        ) {
-          setCurrency("USD");
-        } else {
-          setCurrency("INR");
-        }
+        setCountry(data.country_name || "Unknown");
+        setCountryCode(data.country_code || "");
+        if (data.country_code && data.country_code !== "IN") setCurrency("USD");
       })
-      .catch(() => {
-        // ✅ If detection completely fails, default to USD (PayPal)
-        setCountry("Unknown");
-        setCurrency("USD");
-      })
+      .catch(() => setCountry("Unknown"))
       .finally(() => setLoading(false));
   }, []);
-
 
   const restrictedCountries = ["PK", "BD", "NG", "AF", "CU", "IR", "SD", "SY"];
 
@@ -81,6 +62,12 @@ export default function CheckoutPage() {
     return () => unsub();
   }, [router]);
 
+  // --- Pricing logic (uses coupon)
+  const BASE_INR = 175;
+  const BASE_USD = 1.99;
+  const basePrice = currency === "INR" ? BASE_INR : BASE_USD;
+  const finalPrice = Number((basePrice * (1 - discountPercent / 100)).toFixed(2)); // show to 2 decimals
+
   // ✅ Razorpay Payment
   const handleRazorpay = async () => {
     if (!accepted) {
@@ -93,10 +80,11 @@ export default function CheckoutPage() {
     setProcessing(true);
     setShowHover(false);
 
+    // send finalPrice (number) to backend (your backend should multiply by 100 as before)
     const res = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: 175, currency: "INR", userId: user.uid }),
+      body: JSON.stringify({ amount: finalPrice, currency: currency === "INR" ? "INR" : "USD", userId: user.uid }),
     });
 
     const data = await res.json();
@@ -153,116 +141,135 @@ export default function CheckoutPage() {
         }
       },
       modal: {
-  ondismiss: () => {
-    setProcessing(false); // 🧩 Reset so user can retry
-    setShowHover(true);
-  },
-},
-
+        ondismiss: () => {
+          setProcessing(false); // 🧩 Reset so user can retry
+          setShowHover(true);
+        },
+      },
       prefill: { email: user.email },
       theme: { color: "#2563eb" },
     });
     rzp.open();
   };
 
-  // ✅ PayPal Integration
-// ✅ PayPal Integration (bulletproof terms enforcement)
-useEffect(() => {
-  if (currency === "INR" || !user) return;
-  const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
-  const container = document.getElementById("paypal-button-container");
-  if (!container) return;
-  container.innerHTML = "";
-
-  const renderButtons = () => {
-    if (window.paypal && window.paypal.Buttons) {
-      window.paypal
-        .Buttons({
-          style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
-
-          // 🛑 Stop PayPal popup if Terms not accepted
-          onClick: (data, actions) => {
-            if (!accepted) {
-              // Persist message state safely outside PayPal DOM
-              setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
-              setShowHover(false);
-
-              // Keep message visible for 5s minimum, not instant removal
-              clearTimeout(window.__termsTimer);
-              window.__termsTimer = setTimeout(() => {
-                setInfoMessage("");
-              }, 50000);
-
-              return actions.reject(); // stop popup completely
-            }
-            return actions.resolve(); // allow popup
-          },
-
-          createOrder: async () => {
-            const res = await fetch("/api/create-paypal-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ amount: "1.99", currency: "USD" }),
-            });
-            const data = await res.json();
-            return data.id;
-          },
-
-          onApprove: async (data) => {
-            setProcessing(true);
-            setShowHover(false);
-
-            const capture = await fetch("/api/capture-paypal-order", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
-            });
-            const result = await capture.json();
-
-            if (result.success) {
-              await setDoc(
-                doc(db, "purchases", user.uid),
-                {
-                  hasAccess: true,
-                  paymentId: result.id,
-                  purchasedAt: new Date().toISOString(),
-                },
-                { merge: true }
-              );
-              localStorage.setItem(`${user.email}_access`, "true");
-              alert("✅ Payment successful! Redirecting...");
-              router.push("/dashboard");
-              setTimeout(() => window.location.reload(), 1000);
-            } else {
-              setShowHover(true);
-            }
-
-            setProcessing(false);
-          },
-
-          onError: () => {
-            setShowHover(true);
-            setInfoMessage("⚠️ Payment failed. Please try again or contact @htgstudio.");
-            clearTimeout(window.__termsTimer);
-            window.__termsTimer = setTimeout(() => {
-              setInfoMessage("");
-            }, 6000);
-          },
-        })
-        .render("#paypal-button-container");
+  // --- Coupon handlers (new)
+  const applyCoupon = () => {
+    const code = (couponCode || "").trim().toUpperCase();
+    if (!code) {
+      setCouponError("Please enter a coupon code.");
+      return;
+    }
+    if (code === "HTG25") {
+      setDiscountPercent(25);
+      setCouponApplied(true);
+      setCouponError("");
+      setInfoMessage("✅ Coupon applied — 25% off!");
+      setTimeout(() => setInfoMessage(""), 3000);
+    } else {
+      setCouponError("Invalid coupon code.");
     }
   };
 
-  // ✅ Load PayPal SDK dynamically
-  if (!window.paypal) {
-    const script = document.createElement("script");
-    script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
-    script.onload = renderButtons;
-    document.body.appendChild(script);
-  } else {
-    renderButtons();
-  }
-}, [currency, user,accepted, router]);
+  const removeCoupon = () => {
+    setCouponCode("");
+    setCouponApplied(false);
+    setCouponError("");
+    setDiscountPercent(0);
+    setInfoMessage("");
+  };
+
+  // ✅ PayPal Integration (unchanged except use finalPrice)
+  useEffect(() => {
+    if (currency === "INR" || !user) return;
+    const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
+    const container = document.getElementById("paypal-button-container");
+    if (!container) return;
+    container.innerHTML = "";
+
+    const renderButtons = () => {
+      if (window.paypal && window.paypal.Buttons) {
+        window.paypal
+          .Buttons({
+            style: { layout: "vertical", color: "blue", shape: "rect", label: "paypal" },
+
+            onClick: (data, actions) => {
+              if (!accepted) {
+                setInfoMessage("⚠️ Please accept the Terms & Refund Policy before making a payment.");
+                setShowHover(false);
+                clearTimeout(window.__termsTimer);
+                window.__termsTimer = setTimeout(() => {
+                  setInfoMessage("");
+                }, 50000);
+                return actions.reject();
+              }
+              return actions.resolve();
+            },
+
+            createOrder: async () => {
+              // send finalPrice as string with 2 decimals to PayPal backend
+              const res = await fetch("/api/create-paypal-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ amount: finalPrice.toFixed(2), currency: "USD" }),
+              });
+              const data = await res.json();
+              return data.id;
+            },
+
+            onApprove: async (data) => {
+              setProcessing(true);
+              setShowHover(false);
+
+              const capture = await fetch("/api/capture-paypal-order", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ orderId: data.orderID, userId: user.uid }),
+              });
+              const result = await capture.json();
+
+              if (result.success) {
+                await setDoc(
+                  doc(db, "purchases", user.uid),
+                  {
+                    hasAccess: true,
+                    paymentId: result.id,
+                    purchasedAt: new Date().toISOString(),
+                  },
+                  { merge: true }
+                );
+                localStorage.setItem(`${user.email}_access`, "true");
+                alert("✅ Payment successful! Redirecting...");
+                router.push("/dashboard");
+                setTimeout(() => window.location.reload(), 1000);
+              } else {
+                setShowHover(true);
+              }
+
+              setProcessing(false);
+            },
+
+            onError: () => {
+              setShowHover(true);
+              setInfoMessage("⚠️ Payment failed. Please try again or contact @htgstudio.");
+              clearTimeout(window.__termsTimer);
+              window.__termsTimer = setTimeout(() => {
+                setInfoMessage("");
+              }, 6000);
+            },
+          })
+          .render("#paypal-button-container");
+      }
+    };
+
+    if (!window.paypal) {
+      const script = document.createElement("script");
+      script.src = `https://www.paypal.com/sdk/js?client-id=${PAYPAL_CLIENT_ID}&currency=USD`;
+      script.onload = renderButtons;
+      document.body.appendChild(script);
+    } else {
+      renderButtons();
+    }
+  }, [currency, user, accepted, router, finalPrice]);
 
   // ✅ Auto-hide hover after 10s
   useEffect(() => {
@@ -307,8 +314,41 @@ useEffect(() => {
 
         <div className="bg-gray-50 rounded-lg p-3 mb-6 text-sm text-gray-700 border">
           <p>🌍 You’re accessing from <span className="font-semibold">{country}</span></p>
-          <p>💳 Price: <span className="font-semibold text-blue-600">{currency === "INR" ? "₹175" : "$1.99"}</span> (one-time payment)</p>
+          <p>
+            💳 Price:{" "}
+            <span className="font-semibold text-blue-600">
+              {currency === "INR" ? `₹${finalPrice}` : `$${finalPrice}`}
+            </span>{" "}
+            (one-time payment)
+          </p>
         </div>
+
+        {/* --- Coupon UI (new) */}
+        <div className="mb-4 flex gap-2 items-center justify-center">
+          {!couponApplied ? (
+            <>
+              <input
+                value={couponCode}
+                onChange={(e) => setCouponCode(e.target.value)}
+                placeholder="Coupon code"
+                className="px-3 py-2 border border-gray-300 rounded-lg w-2/3 text-sm"
+              />
+              <button
+                onClick={applyCoupon}
+                disabled={processing}
+                className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold"
+              >
+                Apply
+              </button>
+            </>
+          ) : (
+            <div className="flex items-center gap-3">
+              <span className="px-3 py-2 bg-green-50 text-green-700 rounded-lg font-semibold">HTG25 — 25% OFF</span>
+              <button onClick={removeCoupon} className="text-sm text-red-600 hover:underline">Remove</button>
+            </div>
+          )}
+        </div>
+        {couponError && <p className="text-red-500 text-sm mb-2">{couponError}</p>}
 
         <div className="flex items-center mb-4 text-left">
           <input
@@ -321,10 +361,8 @@ useEffect(() => {
           <label htmlFor="terms" className="ml-2 text-sm text-gray-600">
             I accept the{" "}
             <a href="/terms" target="_blank" className="text-blue-600 hover:underline">Terms & Conditions</a> and{" "}
-            <span className="text-blue-600 hover:underline cursor-default">Refund</span>{' '}
-<a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">
-  Policy
-</a>
+            <span className="text-blue-600 hover:underline cursor-default">Refund</span>{" "}
+            <a href="/refund-policy" target="_blank" className="text-blue-600 hover:underline">Policy</a>
           </label>
         </div>
 
@@ -334,12 +372,11 @@ useEffect(() => {
             disabled={processing}
             className="w-full py-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
           >
-            {processing ? "Processing..." : "Pay ₹175 via Razorpay"}
+            {processing ? "Processing..." : `Pay ₹${finalPrice} via Razorpay`}
           </button>
         ) : (
           <>
             <div id="paypal-button-container" className="w-full mt-3"></div>
-            {/* ✅ Constant text under PayPal */}
             
           </>
         )}
@@ -350,38 +387,34 @@ useEffect(() => {
           </p>
         )}
 
-        {/* ⚠️ Show contact message for all PayPal (non-Indian) users */}
-{/* ⚠️ Show contact message for all PayPal (non-Indian) users */}
-{currency === "USD" && (
-  <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
-    💬 Can’t make payment using the available methods?{" "}
-    <a
-      href="https://t.me/htgstudio"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-blue-600 font-bold hover:underline"
-    >
-      Contact us on Telegram
-    </a>{" "}
-    to pay via <span className="font-semibold">Binance, Payoneer, or your preferred method.</span>
-  </p>
-)}
-
-
+        {currency === "USD" && (
+          <p className="text-sm text-gray-800 mt-5 font-semibold bg-yellow-50 border border-yellow-200 rounded-lg px-3 py-2">
+            💬 Can’t make payment using the available methods?{" "}
+            <a
+              href="https://t.me/htgstudio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 font-bold hover:underline"
+            >
+              Contact us on Telegram
+            </a>{" "}
+            to pay via <span className="font-semibold">Binance, Payoneer, or your preferred method.</span>
+          </p>
+        )}
 
         {/* 💬 Hover for failed payments (auto-hides after 10s) */}
         {showHover && (
           <div className="mt-4 bg-blue-600 text-white text-xs px-4 py-2 rounded-lg shadow-lg animate-pulse">
-    💬 Can’t make payment using the available methods? Contact {" "}
-    <a
-      href="https://t.me/htgstudio"
-      target="_blank"
-      rel="noopener noreferrer"
-      className="underline font-semibold"
-    >
-      @htgstudio
-    </a>
-  </div>
+            💬 Can’t make payment using the available methods? Contact{" "}
+            <a
+              href="https://t.me/htgstudio"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="underline font-semibold"
+            >
+              @htgstudio
+            </a>
+          </div>
         )}
       </div>
     </div>

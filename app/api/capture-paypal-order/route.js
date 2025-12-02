@@ -1,27 +1,38 @@
+// app/api/capture-paypal-order/route.js
 import { NextResponse } from "next/server";
 
-export async function POST(req) {
+export async function POST(request) {
   try {
-    const { orderId } = await req.json();
-
+    const body = await request.json();
+    const orderId = body?.orderId || body?.orderID || body?.order_id;
     const PAYPAL_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID;
     const PAYPAL_SECRET = process.env.PAYPAL_SECRET;
-    const PAYPAL_MODE = process.env.PAYPAL_MODE || "sandbox";
+    const PAYPAL_MODE = (process.env.PAYPAL_MODE || "sandbox").toLowerCase();
+
+    if (!orderId) {
+      return NextResponse.json(
+        { success: false, error: "Missing orderId in request body" },
+        { status: 400 }
+      );
+    }
+
+    if (!PAYPAL_CLIENT_ID || !PAYPAL_SECRET) {
+      console.error("❌ Missing PayPal credentials in environment variables");
+      return NextResponse.json(
+        { success: false, error: "Missing PayPal credentials" },
+        { status: 500 }
+      );
+    }
 
     const PAYPAL_API_BASE =
       PAYPAL_MODE === "live"
         ? "https://api-m.paypal.com"
         : "https://api-m.sandbox.paypal.com";
 
-    if (!orderId) {
-      return NextResponse.json(
-        { success: false, error: "Missing orderId" },
-        { status: 400 }
-      );
-    }
-
-    // ✅ Step 1: Get Access Token again
-    const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString("base64");
+    // Step 1: Obtain access token
+    const auth = Buffer.from(`${PAYPAL_CLIENT_ID}:${PAYPAL_SECRET}`).toString(
+      "base64"
+    );
     const tokenRes = await fetch(`${PAYPAL_API_BASE}/v1/oauth2/token`, {
       method: "POST",
       headers: {
@@ -35,14 +46,18 @@ export async function POST(req) {
     if (!tokenRes.ok) {
       console.error("PayPal Token Error:", tokenData);
       return NextResponse.json(
-        { success: false, error: "Failed to obtain PayPal token", details: tokenData },
+        {
+          success: false,
+          error: "Failed to obtain PayPal access token",
+          details: tokenData,
+        },
         { status: 500 }
       );
     }
 
-    // ✅ Step 2: Capture the order
+    // Step 2: Capture order
     const captureRes = await fetch(
-      `${PAYPAL_API_BASE}/v2/checkout/orders/${orderId}/capture`,
+      `${PAYPAL_API_BASE}/v2/checkout/orders/${encodeURIComponent(orderId)}/capture`,
       {
         method: "POST",
         headers: {
@@ -56,19 +71,28 @@ export async function POST(req) {
     if (!captureRes.ok) {
       console.error("PayPal Capture Error:", captureData);
       return NextResponse.json(
-        { success: false, error: "Capture failed", details: captureData },
+        {
+          success: false,
+          error: "Failed to capture PayPal order",
+          details: captureData,
+        },
         { status: 500 }
       );
     }
 
-    // ✅ Step 3: Return capture info to frontend
+    // Optionally: you can read captureData.purchase_units[0].payments.captures[0] for amount/id
+    // Return capture details so frontend/backend can persist to Firestore
     return NextResponse.json({
       success: true,
-      id: captureData.id,
+      id: captureData.id || orderId,
       status: captureData.status,
+      capture: captureData,
     });
   } catch (err) {
     console.error("🔥 Capture PayPal Order Error:", err);
-    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { success: false, error: err?.message || "Unknown error" },
+      { status: 500 }
+    );
   }
 }
