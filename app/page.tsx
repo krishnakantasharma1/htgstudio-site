@@ -1,5 +1,6 @@
 "use client";
 import { useEffect } from "react";
+
 export const metadata = {
   title: "HTG Studio – Boost Your Phone Performance Fast",
   description: "100% working phone optimization tricks, speed boosters, gaming tweaks, and performance guides—all in one place at HTG Studio.",
@@ -32,6 +33,7 @@ export const metadata = {
     images: "/seo-banner.jpg",
   },
 };
+
 
 export default function Home() {
   useEffect(() => {

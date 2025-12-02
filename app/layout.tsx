@@ -10,6 +10,8 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 
 const inter = Inter({ subsets: ["latin"] });
 
+
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
       const [user, setUser] = useState<any>(null);
       const [menuOpen, setMenuOpen] = useState(false);
@@ -119,6 +121,9 @@ return (
       <html lang="en" className="light">
 
             <body
+
+             
+
                   className={`${inter.className} bg-white text-gray-900 antialiased overflow-x-hidden`}
             >
                   {/* NAVBAR */}
