@@ -57,6 +57,26 @@ export default function Head() {
       <link rel="dns-prefetch" href="https://checkout.razorpay.com" />
       <link rel="dns-prefetch" href="https://www.paypal.com" />
 
+
+     
+
+{/* Google Analytics */}
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-GMFTYPE28E"></script>
+<script
+  dangerouslySetInnerHTML={{
+    __html: `
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', 'G-GMFTYPE28E', { page_path: window.location.pathname });
+    `,
+  }}
+/>
+
+
+
+
+
       {/* Small inline JSON-LD for Site & Organization (helps rich results) */}
       <script
         type="application/ld+json"
@@ -83,6 +103,8 @@ export default function Head() {
               },
             ],
           }),
+
+
         }}
       />
     </>
