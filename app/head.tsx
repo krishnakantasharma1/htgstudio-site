@@ -77,6 +77,8 @@ export default function Head() {
 
 
 
+
+
       {/* Small inline JSON-LD for Site & Organization (helps rich results) */}
       <script
         type="application/ld+json"
