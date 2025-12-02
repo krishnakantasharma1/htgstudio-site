@@ -43,7 +43,7 @@ export default function DownloadCodePage({ params }) {
 
   // navigate to course page (change path here if your course path differs)
   const gotoCourse = () => {
-    router.push("/courses/phone-boost");
+    router.push("/course");
   };
 
 
@@ -60,14 +60,13 @@ export default function DownloadCodePage({ params }) {
         <div className="bg-white rounded-2xl shadow-lg border border-gray-100 w-full max-w-lg p-6 text-center">
           {/* Course promo at top (small) to promote course even when code invalid */}
           <h2 className="text-2xl font-bold text-gray-900 mb-3">Phone Performance Boost Masterclass:-</h2>
-          <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.15 }}
+          <h4
+          
           className="max-w-2xl text-base sm:text-lg text-gray-600 mb-8 leading-relaxed"
-        >
+>
           Advanced tweaks that nobody reveals -
-        </motion.p>
+        </h4>
+          
           <div
             role="button"
             onClick={gotoCourse}
@@ -132,6 +131,12 @@ export default function DownloadCodePage({ params }) {
         {/* Course header + promo */}
         <div className="mb-6">
           <h2 className="text-3xl font-extrabold text-gray-900 mb-2">Phone Performance Boost Masterclass:-</h2>
+          <h4
+          
+          className="max-w-2xl text-base sm:text-lg text-gray-600 mb-8 leading-relaxed"
+>
+          Advanced tweaks that nobody reveals -
+        </h4>
           <div
             role="button"
             onClick={gotoCourse}
